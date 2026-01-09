@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { deleteProject, getProjects, updateProjectStatus } from '../services/apiProjects';
 import type { Project } from '../types';
-import { Plus, LayoutGrid, List as ListIcon, Loader2, Calendar, MoreVertical, Pencil, Trash2, Eye, EyeOff, ArrowUpDown, ArrowUp, ArrowDown, Wallet, Settings2, Kanban as KanbanIcon } from 'lucide-react';
+import { Plus, LayoutGrid, List as ListIcon, Loader2, Calendar, MoreVertical, Pencil, Trash2, Eye, EyeOff, ArrowUpDown, ArrowUp, ArrowDown, Wallet, Settings2, Kanban as KanbanIcon, CheckCircle2, Minus, Maximize2 } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { useState } from 'react';
 import { cn } from '../lib/utils';
@@ -74,8 +74,9 @@ const ProjectActions = ({
 );
 
 export default function Projects() {
-    const [viewMode, setViewMode] = useState<'grid' | 'list' | 'kanban'>('kanban');
-    const [sortBy, setSortBy] = useState<'date_desc' | 'date_asc' | 'price_desc' | 'price_asc' | 'name_asc'>('date_desc');
+    const [viewMode, setViewMode] = useState<'grid' | 'list' | 'kanban'>('grid');
+    const [cardSize, setCardSize] = useState<'sm' | 'md' | 'lg'>('md');
+    const [sortBy, setSortBy] = useState<'date_desc' | 'date_asc' | 'price_desc' | 'price_asc' | 'name_asc' | 'status'>('date_desc');
     const [isProjectDialogOpen, setIsProjectDialogOpen] = useState(false);
     const [isStatusManagerOpen, setIsStatusManagerOpen] = useState(false);
     const [showCompleted, setShowCompleted] = useState(false);
@@ -220,6 +221,10 @@ export default function Projects() {
                 return (a.price || 0) - (b.price || 0);
             case 'name_asc':
                 return a.title.localeCompare(b.title);
+            case 'status':
+                const statusA = statuses?.find(s => s.id === a.status_id);
+                const statusB = statuses?.find(s => s.id === b.status_id);
+                return (statusA?.order || 0) - (statusB?.order || 0);
             default:
                 return 0;
         }
@@ -256,6 +261,9 @@ export default function Projects() {
                             <DropdownMenuItem onClick={() => setSortBy('name_asc')}>
                                 <ArrowDown className="mr-2 h-4 w-4" /> İsim (A-Z)
                             </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => setSortBy('status')}>
+                                <KanbanIcon className="mr-2 h-4 w-4" /> Durum (Kanban Sırası)
+                            </DropdownMenuItem>
                         </DropdownMenuContent>
                     </DropdownMenu>
 
@@ -282,6 +290,33 @@ export default function Projects() {
                             <KanbanIcon className="w-4 h-4" />
                         </button>
                     </div>
+
+                    {/* Card Size Controls - only for grid view */}
+                    {viewMode === 'grid' && (
+                        <div className="border rounded-lg p-1 bg-background flex items-center gap-1">
+                            <button
+                                onClick={() => setCardSize('sm')}
+                                className={cn("p-2 rounded-md transition-all", cardSize === 'sm' ? "bg-muted shadow-sm" : "hover:bg-muted/50")}
+                                title="Küçük Kartlar"
+                            >
+                                <Minus className="w-4 h-4" />
+                            </button>
+                            <button
+                                onClick={() => setCardSize('md')}
+                                className={cn("p-2 rounded-md transition-all", cardSize === 'md' ? "bg-muted shadow-sm" : "hover:bg-muted/50")}
+                                title="Orta Kartlar"
+                            >
+                                <LayoutGrid className="w-4 h-4" />
+                            </button>
+                            <button
+                                onClick={() => setCardSize('lg')}
+                                className={cn("p-2 rounded-md transition-all", cardSize === 'lg' ? "bg-muted shadow-sm" : "hover:bg-muted/50")}
+                                title="Büyük Kartlar"
+                            >
+                                <Maximize2 className="w-4 h-4" />
+                            </button>
+                        </div>
+                    )}
 
                     <Button
                         variant="outline"
@@ -328,7 +363,13 @@ export default function Projects() {
             ) : (
                 <div className={cn(
                     "grid gap-4",
-                    viewMode === 'grid' ? "grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4" : "grid-cols-1"
+                    viewMode === 'grid'
+                        ? cardSize === 'sm'
+                            ? "grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6"
+                            : cardSize === 'lg'
+                                ? "grid-cols-1 md:grid-cols-2"
+                                : "grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
+                        : "grid-cols-1"
                 )}>
                     {sortedProjects.map((project) => (
                         <div
@@ -341,8 +382,17 @@ export default function Projects() {
                             {viewMode === 'grid' ? (
                                 <>
                                     <div className="flex items-start justify-between">
-                                        <div className={cn("px-2.5 py-0.5 rounded-full text-xs font-semibold", getStatusColor(project.status_id))}>
-                                            {getStatusLabel(project.status_id)}
+                                        <div className="flex items-center gap-2">
+                                            <div className={cn("px-2.5 py-0.5 rounded-full text-xs font-semibold", getStatusColor(project.status_id))}>
+                                                {getStatusLabel(project.status_id)}
+                                            </div>
+                                            {/* @ts-ignore */}
+                                            {(project.photo_selections?.status === 'completed' || (Array.isArray(project.photo_selections) && project.photo_selections[0]?.status === 'completed')) && (
+                                                <div className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-green-100 text-green-700 text-xs font-bold border border-green-200 animate-in fade-in zoom-in" title="Müşteri seçimini tamamladı">
+                                                    <CheckCircle2 className="w-3 h-3" />
+                                                    <span className="hidden xl:inline">Seçim Tamam</span>
+                                                </div>
+                                            )}
                                         </div>
                                         <ProjectActions
                                             project={project}
@@ -396,7 +446,8 @@ export default function Projects() {
                         </div>
                     ))}
                 </div>
-            )}
+            )
+            }
 
             <ProjectDialog
                 isOpen={isProjectDialogOpen}

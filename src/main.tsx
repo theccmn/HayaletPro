@@ -2,6 +2,7 @@ import { StrictMode, Component, type ErrorInfo, type ReactNode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import './index.css'
+import { NotificationProvider } from './context/NotificationContext'
 import App from './App.tsx'
 
 class ErrorBoundary extends Component<{ children: ReactNode }, { hasError: boolean, error: Error | null }> {
@@ -40,7 +41,9 @@ createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <ErrorBoundary>
       <QueryClientProvider client={queryClient}>
-        <App />
+        <NotificationProvider>
+          <App />
+        </NotificationProvider>
       </QueryClientProvider>
     </ErrorBoundary>
   </StrictMode>,

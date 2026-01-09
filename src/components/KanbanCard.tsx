@@ -1,6 +1,6 @@
 import { Draggable } from '@hello-pangea/dnd';
 import type { Project } from '../types';
-import { Calendar, MoreVertical, Pencil, Trash2, Wallet, Eye } from 'lucide-react';
+import { Calendar, MoreVertical, Pencil, Trash2, Wallet, Eye, CheckCircle2 } from 'lucide-react';
 import { format } from 'date-fns';
 import { tr } from 'date-fns/locale';
 import { Button } from './ui/button';
@@ -35,9 +35,18 @@ export function KanbanCard({ project, index, onEdit, onDelete, onAddTransaction,
                     }}
                 >
                     <div className="flex justify-between items-start mb-2">
-                        <span className="text-xs font-medium text-muted-foreground px-2 py-1 bg-muted rounded-full">
-                            {project.client_name}
-                        </span>
+                        <div className="flex flex-wrap gap-2 items-center">
+                            <span className="text-xs font-medium text-muted-foreground px-2 py-1 bg-muted rounded-full">
+                                {project.client_name}
+                            </span>
+                            {/* @ts-ignore */}
+                            {(project.photo_selections?.status === 'completed' || (Array.isArray(project.photo_selections) && project.photo_selections[0]?.status === 'completed')) && (
+                                <div className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-green-100 text-green-700 text-xs font-bold border border-green-200 animate-in fade-in zoom-in" title="Müşteri seçimini tamamladı">
+                                    <CheckCircle2 className="w-3 h-3" />
+                                    <span className="text-[10px]">Seçildi</span>
+                                </div>
+                            )}
+                        </div>
                         <DropdownMenu>
                             <DropdownMenuTrigger asChild>
                                 <Button

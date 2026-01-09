@@ -1,5 +1,6 @@
-import { Menu, Search, Bell, User } from 'lucide-react';
+import { Menu, Search, User } from 'lucide-react';
 import { Button } from './ui/button';
+import { NotificationBell } from './NotificationBell';
 
 const Header = () => {
     return (
@@ -8,7 +9,7 @@ const Header = () => {
                 <Menu className="h-6 w-6" />
                 <span className="sr-only">Toggle navigation menu</span>
             </button>
-            <div className="w-full flex-1">
+            <div className="flex-1">
                 <form>
                     <div className="relative md:w-2/3 lg:w-1/3">
                         <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
@@ -21,10 +22,7 @@ const Header = () => {
                 </form>
             </div>
             <div className="flex items-center gap-2">
-                <Button variant="ghost" size="icon" className="rounded-full text-muted-foreground hover:text-foreground">
-                    <Bell className="h-5 w-5" />
-                    <span className="sr-only">Bildirimler</span>
-                </Button>
+                <NotificationBell />
                 <Button variant="ghost" size="icon" className="rounded-full overflow-hidden border">
                     <User className="h-5 w-5 text-muted-foreground" />
                     <span className="sr-only">Kullanıcı Menüsü</span>

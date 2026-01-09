@@ -45,7 +45,7 @@ export const listDriveFiles = async (folderId: string): Promise<DriveFile[]> => 
         return data.files.map((f: any) => ({
             ...f,
             thumbnailLink: f.thumbnailLink ? f.thumbnailLink.replace('=s220', '=s600') : '', // Grid thumbnail
-            webContentLink: f.thumbnailLink ? f.thumbnailLink.replace('=s220', '=s3000') : f.webContentLink, // Lightbox high-res
+            webContentLink: f.thumbnailLink ? f.thumbnailLink.replace('=s220', '=s1920') : f.webContentLink, // Lightbox high-res (Full HD)
         }));
 
     } catch (error) {

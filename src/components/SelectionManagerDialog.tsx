@@ -1,5 +1,6 @@
 
 import { useState, useEffect } from 'react';
+import { supabase } from '../lib/supabase';
 import { Dialog } from './ui/dialog';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
@@ -38,6 +39,34 @@ export function SelectionManagerDialog({ isOpen, onClose, project }: SelectionMa
         queryFn: () => getSelectionByProjectId(project!.id),
         enabled: !!project?.id
     });
+
+    // Realtime subscription for status updates
+    useEffect(() => {
+        if (!existingSelection) return;
+
+        const channel = supabase
+            .channel(`selection-${existingSelection.id}`)
+            .on(
+                'postgres_changes',
+                {
+                    event: 'UPDATE',
+                    schema: 'public',
+                    table: 'photo_selections',
+                    filter: `id=eq.${existingSelection.id}`
+                },
+                (payload: any) => {
+                    // Check if status changed
+                    if (payload.new.status !== existingSelection.status) {
+                        queryClient.invalidateQueries({ queryKey: ['selection', project?.id] });
+                    }
+                }
+            )
+            .subscribe();
+
+        return () => {
+            supabase.removeChannel(channel);
+        };
+    }, [existingSelection?.id, queryClient, project?.id]);
 
     // Generate random PIN on mount or open
     useEffect(() => {
@@ -80,6 +109,12 @@ export function SelectionManagerDialog({ isOpen, onClose, project }: SelectionMa
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['selection', project?.id] });
+            queryClient.invalidateQueries({ queryKey: ['projects'] }); // Refresh kanban
+            onClose();
+        },
+        onError: (error) => {
+            console.error('Delete failed:', error);
+            alert('Silme işlemi başarısız: ' + (error as Error).message);
         }
     });
 
@@ -162,10 +197,13 @@ export function SelectionManagerDialog({ isOpen, onClose, project }: SelectionMa
                             <Button size="icon" variant="outline" onClick={copyLink}>
                                 {copied ? <Check size={16} className="text-green-600" /> : <Copy size={16} />}
                             </Button>
-                            <Button size="icon" variant="outline" asChild>
-                                <a href={`/select/${existingSelection.access_token}`} target="_blank" rel="noreferrer">
-                                    <ExternalLink size={16} />
-                                </a>
+                            <Button
+                                size="icon"
+                                variant="outline"
+                                onClick={() => window.open(`/select/${existingSelection.access_token}`, '_blank')}
+                                title="Yeni sekmede aç"
+                            >
+                                <ExternalLink size={16} />
                             </Button>
                         </div>
                     </div>
@@ -173,7 +211,7 @@ export function SelectionManagerDialog({ isOpen, onClose, project }: SelectionMa
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                         <div className="p-4 border rounded-xl bg-white text-center">
                             <div className="text-xs text-muted-foreground font-bold uppercase mb-1">Durum</div>
-                            <div className="font-medium capitalize px-2 py-1 bg-slate-100 rounded-full inline-block text-sm">{existingSelection.status}</div>
+                            <div className="font-medium capitalize px-2 py-1 bg-slate-100 rounded-full inline-block text-xs truncate max-w-full" title={existingSelection.status}>{existingSelection.status}</div>
                         </div>
                         <div className="p-4 border rounded-xl bg-white text-center">
                             <div className="text-xs text-muted-foreground font-bold uppercase mb-1">PIN Kodu</div>
@@ -199,7 +237,7 @@ export function SelectionManagerDialog({ isOpen, onClose, project }: SelectionMa
                             variant="destructive"
                             size="sm"
                             onClick={() => {
-                                if (confirm("Paneli tamamen silmek üzeresiniz. Müşteri erişimi kaybolacak.")) {
+                                if (window.confirm("⚠️ Paneli tamamen silmek üzeresiniz!\n\nMüşteri erişimi kaybolacak ve seçim verileri silinecek.\n\nDevam etmek istiyor musunuz?")) {
                                     deleteMutation.mutate();
                                 }
                             }}
@@ -234,18 +272,16 @@ export function SelectionManagerDialog({ isOpen, onClose, project }: SelectionMa
                                 <Label className="text-xs text-muted-foreground uppercase">Müşteri</Label>
                                 <div className="p-2 bg-slate-50 border rounded-md text-sm font-medium">{project.client_name}</div>
                             </div>
-                            <div className="grid grid-cols-2 gap-2">
-                                <div className="space-y-1.5">
-                                    <Label className="text-xs text-muted-foreground uppercase">Çekim Tarihi</Label>
-                                    <div className="p-2 bg-slate-50 border rounded-md text-sm">
-                                        {project.start_date ? format(new Date(project.start_date), 'dd.MM.yyyy') : '-'}
-                                    </div>
+                            <div className="space-y-1.5">
+                                <Label className="text-xs text-muted-foreground uppercase">Çekim Tarihi</Label>
+                                <div className="p-2 bg-slate-50 border rounded-md text-sm">
+                                    {project.start_date ? format(new Date(project.start_date), 'dd.MM.yyyy') : '-'}
                                 </div>
-                                <div className="space-y-1.5">
-                                    <Label className="text-xs text-muted-foreground uppercase">Tutar</Label>
-                                    <div className="p-2 bg-slate-50 border rounded-md text-sm">
-                                        {project.price ? `₺${project.price}` : '-'}
-                                    </div>
+                            </div>
+                            <div className="space-y-1.5">
+                                <Label className="text-xs text-muted-foreground uppercase">Tutar</Label>
+                                <div className="p-2 bg-slate-50 border rounded-md text-sm">
+                                    {project.price ? `₺${project.price.toLocaleString('tr-TR')}` : '-'}
                                 </div>
                             </div>
                         </div>

@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { ChevronLeft, ChevronRight, X, CheckCircle, Star } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import type { DriveFile } from '../../services/apiGoogleDrive';
@@ -53,6 +53,29 @@ export function SelectionLightbox({
         return () => window.removeEventListener('keydown', handleKey);
     }, [currentIndex, photos.length, onNavigate, onClose]);
 
+    const [isHighResLoaded, setIsHighResLoaded] = useState(false);
+
+    // Reset loading state when index changes
+    useEffect(() => {
+        setIsHighResLoaded(false);
+    }, [currentIndex]);
+
+    // Preload Next/Prev Images
+    useEffect(() => {
+        const preloadImage = (index: number) => {
+            if (photos[index]) {
+                const img = new Image();
+                img.src = photos[index].webContentLink;
+            }
+        };
+
+        const nextIndex = (currentIndex + 1) % photos.length;
+        const prevIndex = (currentIndex - 1 + photos.length) % photos.length;
+
+        preloadImage(nextIndex);
+        preloadImage(prevIndex);
+    }, [currentIndex, photos]);
+
     return (
         <div className="fixed inset-0 z-[60] bg-black/95 flex flex-col animate-in fade-in duration-200">
             {/* Header */}
@@ -70,10 +93,23 @@ export function SelectionLightbox({
                     <ChevronLeft size={32} />
                 </button>
 
+                {/* Progressive Loading: Show low-res first if high-res not ready */}
+                {!isHighResLoaded && (
+                    <img
+                        src={activePhoto.thumbnailLink}
+                        className="absolute max-h-full max-w-full object-contain blur-md scale-105 opacity-50"
+                        alt="loading-preview"
+                    />
+                )}
+
                 <img
                     src={activePhoto.webContentLink}
-                    className="max-h-full max-w-full object-contain shadow-2xl transition-opacity duration-300"
+                    className={cn(
+                        "max-h-full max-w-full object-contain shadow-2xl transition-opacity duration-300 relative z-10",
+                        isHighResLoaded ? "opacity-100" : "opacity-0"
+                    )}
                     alt={activePhoto.name}
+                    onLoad={() => setIsHighResLoaded(true)}
                 />
 
                 <button
