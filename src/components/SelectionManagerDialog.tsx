@@ -8,9 +8,7 @@ import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query';
 import { createSelection, getSelectionByProjectId, deleteSelection, updateSelectionSettings, type SelectionSettings, type ExtraLimitType } from '../services/apiPhotoSelection';
 import type { Project } from '../types';
 import { Loader2, Copy, Check, ExternalLink, Plus, Trash2, Info, RefreshCw, Pencil, X, Save } from 'lucide-react';
-import { cn } from '../lib/utils';
 import { format } from 'date-fns';
-import { tr } from 'date-fns/locale';
 
 interface SelectionManagerDialogProps {
     isOpen: boolean;
@@ -85,9 +83,7 @@ export function SelectionManagerDialog({ isOpen, onClose, project }: SelectionMa
         }
     });
 
-    const handleCreate = () => {
-        createMutation.mutate();
-    };
+
 
     const handleSave = () => {
         if (isEditing) {
@@ -139,7 +135,6 @@ export function SelectionManagerDialog({ isOpen, onClose, project }: SelectionMa
             onClose={onClose}
             title={existingSelection && !isEditing ? "Panel Durumu" : (isEditing ? "Paneli Düzenle" : "Yeni Proje Seçim Paneli")}
             description={existingSelection && !isEditing ? "Aktif seçim paneli detayları." : "Ayarları ve klasör bağlantısını güncelleyin."}
-            className="md:max-w-4xl" // Wider dialog for split view
         >
             {isLoading ? (
                 <div className="flex justify-center p-8"><Loader2 className="animate-spin w-8 h-8 text-primary" /></div>

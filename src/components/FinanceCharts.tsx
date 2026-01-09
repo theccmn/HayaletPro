@@ -7,12 +7,10 @@ import {
     CartesianGrid,
     Tooltip,
     Legend,
-    ResponsiveContainer,
-    AreaChart,
-    Area
+    ResponsiveContainer
 } from 'recharts';
 import type { Transaction } from '../types';
-import { format, parseISO, startOfWeek, endOfWeek, eachDayOfInterval, subDays, startOfMonth, endOfMonth, eachMonthOfInterval, subMonths, isSameDay, isSameMonth } from 'date-fns';
+import { format, parseISO, eachDayOfInterval, subDays, eachMonthOfInterval, subMonths, isSameDay, isSameMonth } from 'date-fns';
 import { tr } from 'date-fns/locale';
 
 interface FinanceChartsProps {
@@ -40,8 +38,6 @@ export function FinanceCharts({ transactions, period }: FinanceChartsProps) {
             });
         } else if (period === 'month') {
             const end = new Date();
-            const start = startOfMonth(end);
-            const days = eachDayOfInterval({ start, end }); // Days of current month up to now, or just last 30 days?
             // Let's do last 30 days for better trend
             const start30 = subDays(end, 29);
             const days30 = eachDayOfInterval({ start: start30, end });

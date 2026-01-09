@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { ChevronLeft, ChevronRight, X, CheckCircle, Star, Maximize2 } from 'lucide-react';
+import { ChevronLeft, ChevronRight, X, CheckCircle, Star } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import type { DriveFile } from '../../services/apiGoogleDrive';
 import type { SelectedPhoto, ExtraLimitType } from '../../services/apiPhotoSelection';
@@ -106,7 +106,7 @@ export function SelectionLightbox({
                         {/* Extra Options (Visible only if selected) */}
                         {selectionState.selected && (
                             <div className="flex flex-wrap gap-2 justify-center animate-in slide-in-from-left-2 fade-in">
-                                {extraLimits.map((el, idx) => {
+                                {extraLimits.map((el) => {
                                     const isSelected = selectionState.extraSelections?.[el.id];
                                     return (
                                         <button

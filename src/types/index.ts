@@ -14,6 +14,7 @@ export interface Project {
     start_date?: string;
     status_id: string; // Updated to reference ProjectStatus
     details?: string;
+    notes?: string;
     price?: number;
     client_id?: string | null;
     created_at?: string;
@@ -77,3 +78,16 @@ export interface InventoryItem {
 }
 
 export type NewInventoryItem = Omit<InventoryItem, 'id' | 'created_at'>;
+
+export interface Expense {
+    id: string;
+    title: string;
+    amount: number;
+    category: string;
+    date: string;
+    project_id?: string | null;
+    created_at?: string;
+    projects?: {
+        title: string;
+    } | null;
+}

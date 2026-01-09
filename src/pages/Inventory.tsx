@@ -4,9 +4,8 @@ import { getInventory, deleteInventoryItem } from '../services/apiInventory';
 import { InventoryDialog } from '../components/InventoryDialog';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
-import { Plus, Search, Filter, MoreVertical, Edit, Trash2, Box, Wrench, AlertCircle } from 'lucide-react';
+import { Plus, Search, Edit, Trash2, Box, Wrench, AlertCircle } from 'lucide-react';
 import type { InventoryItem } from '../types';
-import { cn } from '../lib/utils';
 
 export default function Inventory() {
     const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -15,7 +14,7 @@ export default function Inventory() {
     const [categoryFilter, setCategoryFilter] = useState('All');
 
     const queryClient = useQueryClient();
-    const { data: inventory, isLoading } = useQuery({
+    const { data: inventory } = useQuery({
         queryKey: ['inventory'],
         queryFn: getInventory
     });

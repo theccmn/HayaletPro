@@ -6,14 +6,12 @@ import { getTransactions } from '../services/apiFinance';
 import {
     format, startOfMonth, endOfMonth, startOfWeek, endOfWeek,
     eachDayOfInterval, isSameMonth, isSameDay, addMonths, subMonths,
-    addWeeks, subWeeks, addDays, subDays, startOfDay, endOfDay,
-    isWithinInterval, setHours, setMinutes
+    addWeeks, subWeeks, addDays, subDays, startOfDay, endOfDay
 } from 'date-fns';
 import { tr } from 'date-fns/locale';
 import { Button } from '../components/ui/button';
-import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, Clock } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Clock } from 'lucide-react';
 import { cn } from '../lib/utils';
-import type { Project, Transaction } from '../types';
 
 type ViewMode = 'month' | 'week' | 'day';
 
@@ -212,7 +210,6 @@ export default function Calendar() {
 
                             {/* Days Columns */}
                             {daysToShow.map(day => {
-                                const currentHourDate = setHours(day, hour);
                                 // Find events that start in this hour
                                 const hourEvents = events.filter(e => isSameDay(e.date, day) && e.date.getHours() === hour);
 

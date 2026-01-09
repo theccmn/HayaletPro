@@ -11,12 +11,18 @@ export interface DriveFile {
     mimeType: string;
 }
 
+import { getSetting } from './apiSettings';
+
 export const listDriveFiles = async (folderId: string): Promise<DriveFile[]> => {
-    // Priority: LocalStorage -> Env Var
-    const API_KEY = localStorage.getItem('google_drive_api_key') || ENV_API_KEY;
+    // Priority: Database -> Env Var
+    let API_KEY = await getSetting('google_drive_api_key');
 
     if (!API_KEY) {
-        console.warn("No Google API Key found (checked local storage and env). Returning mock data.");
+        API_KEY = ENV_API_KEY;
+    }
+
+    if (!API_KEY) {
+        console.warn("No Google API Key found (checked database and env). Returning mock data.");
         return getMockFiles();
     }
 

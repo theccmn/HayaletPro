@@ -5,7 +5,7 @@ import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { createPackage, updatePackage } from '../services/apiPackages';
-import type { Package, NewPackage } from '../types';
+import type { Package } from '../types';
 import { useEffect } from 'react';
 import { Loader2, Plus, X } from 'lucide-react';
 
@@ -58,7 +58,7 @@ export function PackageDialog({ isOpen, onClose, itemToEdit }: PackageDialogProp
 
     const mutation = useMutation({
         mutationFn: (data: any) => {
-            const payload: NewPackage = {
+            const payload: Omit<Package, 'id' | 'created_at'> = {
                 name: data.name,
                 description: data.description,
                 price: data.price,

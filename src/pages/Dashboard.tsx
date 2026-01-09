@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { getTransactions } from '../services/apiFinance';
 import { getProjects } from '../services/apiProjects';
-import { LayoutGrid, TrendingUp, Wallet, Plus, ArrowRight } from 'lucide-react';
+import { LayoutGrid, TrendingUp, Wallet, ArrowRight } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Link } from 'react-router-dom';
 import { useState } from 'react';
@@ -29,10 +29,6 @@ export default function Dashboard() {
         .reduce((sum, t) => sum + (t.amount || 0), 0) || 0;
 
     const netProfit = totalIncome - totalExpense;
-    const activeProjectsCount = projects?.filter(p => p.status_id !== 'completed' && p.status_id !== 'cancelled').length || 0;
-    // Note: status_id checks might need actual logic if status IDs are UUIDs. 
-    // Since I don't have exact status IDs handy without fetching statuses, I'll just count all for now or check if not 'Tamamlandı'.
-    // Better: Count all.
 
     return (
         <div className="flex flex-col gap-6">

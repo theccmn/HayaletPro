@@ -2,6 +2,7 @@
 import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { getPackages, deletePackage } from '../services/apiPackages';
+import { getSetting, updateSetting } from '../services/apiSettings';
 import { PackageDialog } from '../components/PackageDialog';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -20,20 +21,28 @@ export default function Settings() {
     const [showSavedkey, setShowSavedKey] = useState(false);
 
     const queryClient = useQueryClient();
-    const { data: packages, isLoading } = useQuery({
+    const { data: packages } = useQuery({
         queryKey: ['packages'],
         queryFn: getPackages
     });
 
     useEffect(() => {
-        const savedKey = localStorage.getItem('google_drive_api_key');
-        if (savedKey) setDriveApiKey(savedKey);
+        const loadSettings = async () => {
+            const key = await getSetting('google_drive_api_key');
+            if (key) setDriveApiKey(key);
+        };
+        loadSettings();
     }, []);
 
-    const handleSaveKey = () => {
-        localStorage.setItem('google_drive_api_key', driveApiKey);
-        setShowSavedKey(true);
-        setTimeout(() => setShowSavedKey(false), 2000);
+    const handleSaveKey = async () => {
+        try {
+            await updateSetting('google_drive_api_key', driveApiKey);
+            setShowSavedKey(true);
+            setTimeout(() => setShowSavedKey(false), 2000);
+        } catch (error) {
+            console.error('Failed to save API key:', error);
+            alert('Ayarlar kaydedilirken bir hata oluştu.');
+        }
     };
 
     const deleteMutation = useMutation({
@@ -122,7 +131,7 @@ export default function Settings() {
                             </Button>
                         </div>
                         <p className="text-[10px] text-muted-foreground">
-                            Bu anahtar sadece tarayıcınızın yerel hafızasında (LocalStorage) saklanır. Sunucuya gönderilmez.
+                            Bu anahtar güvenli bir şekilde veritabanında saklanır.
                             Google Cloud Console üzerinden "Drive API" servisini aktif edip bir API Key almalısınız.
                         </p>
                     </div>

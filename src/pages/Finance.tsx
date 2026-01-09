@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { getTransactions } from '../services/apiFinance';
-import { Loader2, Plus, TrendingDown, TrendingUp, Wallet, Filter } from 'lucide-react';
+import { Loader2, Plus, TrendingDown, TrendingUp, Wallet } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { format } from 'date-fns';
 import { tr } from 'date-fns/locale';
@@ -8,7 +8,6 @@ import { useState } from 'react';
 import { cn } from '../lib/utils';
 import { TransactionDialog } from '../components/TransactionDialog';
 import { FinanceCharts } from '../components/FinanceCharts';
-import { getProjects } from '../services/apiProjects'; // Keep fetching projects if needed for specific logic, but transaction join handles basic title
 
 export default function Finance() {
     const [isDialogOpen, setIsDialogOpen] = useState(false);

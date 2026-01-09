@@ -1,5 +1,4 @@
 import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { Dialog } from './ui/dialog';
 import { Button } from './ui/button';
@@ -10,25 +9,10 @@ import { createProject, updateProject } from '../services/apiProjects';
 import { getClients, createClient } from '../services/apiClients';
 import { getPackages } from '../services/apiPackages';
 import { getStatuses } from '../services/apiStatuses';
-import { Loader2, User, Search, Plus, Tag, Check, Calendar, Package as PackageIcon, ArrowRight, ArrowLeft } from 'lucide-react';
+import { Loader2, Search, Plus, Tag, Check, Package as PackageIcon, ArrowRight, ArrowLeft } from 'lucide-react';
 import { cn } from '../lib/utils';
 import type { Project, Client, Package } from '../types';
 import { useState, useEffect } from 'react';
-
-// Schema for Step 2 (Client Details) - subset of full client
-const clientStepSchema = z.object({
-    name: z.string().min(1, 'Müşteri adı gereklidir'),
-    phone: z.string().optional(),
-    tags: z.string().optional(), // Comma separated string for UI, convert to array later
-});
-
-// Schema for Step 3 (Project Info)
-const projectStepSchema = z.object({
-    title: z.string().min(1, 'Proje adı gereklidir'),
-    status_id: z.string().min(1, 'Durum seçimi gereklidir'),
-    start_date: z.string().optional(),
-    notes: z.string().optional(),
-});
 
 // Combined Schema for final submission check
 const fullSchema = z.object({
@@ -84,7 +68,7 @@ export function ProjectDialog({ isOpen, onClose, projectToEdit }: ProjectDialogP
     );
 
     // Form
-    const { register, handleSubmit, formState: { errors }, reset, setValue, watch, trigger } = useForm<ProjectFormValues>({
+    const { register, handleSubmit, reset, setValue, watch, trigger } = useForm<ProjectFormValues>({
         shouldUnregister: false,
         defaultValues: {
             title: '',
