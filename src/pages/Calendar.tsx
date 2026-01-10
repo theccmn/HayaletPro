@@ -16,9 +16,9 @@ import { cn } from '../lib/utils';
 type ViewMode = 'month' | 'week' | 'day';
 
 // Helper to determine text color based on background
+// Helper to determine text color based on background
 const getContrastColor = (hexColor: string) => {
-    // Default to white if invalid
-    if (!hexColor || !hexColor.startsWith('#')) return '#ffffff';
+    if (!hexColor || !hexColor.startsWith('#')) return '#000000'; // Default to black for safety
 
     // Convert hex to RGB
     const r = parseInt(hexColor.substr(1, 2), 16);
@@ -28,8 +28,9 @@ const getContrastColor = (hexColor: string) => {
     // Calculate YIQ ratio
     const yiq = ((r * 299) + (g * 587) + (b * 114)) / 1000;
 
-    // Check contrast
-    return (yiq >= 128) ? '#000000' : '#ffffff';
+    // Check contrast (>= 128 is light, so use black text)
+    // Decreased threshold slightly to favor black text on mid-tones
+    return (yiq >= 100) ? '#000000' : '#ffffff';
 };
 
 interface CalendarEvent {
@@ -58,16 +59,29 @@ export default function Calendar() {
         // 1. Projects
         projects?.forEach(p => {
             if (p.start_date) {
-                const status = statuses?.find(s => s.id === p.status_id);
-                const bg = status?.color || '#3b82f6';
-                allEvents.push({
-                    id: p.id,
-                    title: p.title,
-                    date: new Date(p.start_date),
-                    color: bg,
-                    textColor: getContrastColor(bg),
-                    type: 'project'
-                });
+                let dateStr = p.start_date;
+                // Handle complex date format "start|end" or just simple dates
+                if (dateStr && typeof dateStr === 'string') {
+                    if (dateStr.includes('|')) {
+                        dateStr = dateStr.split('|')[0];
+                    }
+
+                    const dateObj = new Date(dateStr);
+                    if (!isNaN(dateObj.getTime())) {
+                        const status = statuses?.find(s => s.id === p.status_id);
+                        const bg = status?.color || '#3b82f6';
+
+                        allEvents.push({
+                            id: p.id,
+                            title: p.title,
+                            date: dateObj,
+                            color: bg,
+                            textColor: getContrastColor(bg),
+                            type: 'project',
+                            time: format(dateObj, 'HH:mm')
+                        });
+                    }
+                }
             }
         });
 
@@ -151,15 +165,17 @@ export default function Calendar() {
                                     {dayEvents.map(event => (
                                         <div
                                             key={event.id}
-                                            className="text-[10px] px-1.5 py-0.5 rounded truncate font-medium cursor-pointer transition-opacity hover:opacity-80 flex items-center gap-1"
+                                            className="text-[10px] px-1.5 py-0.5 rounded truncate font-medium cursor-pointer flex items-center gap-1 border border-white/20 shadow-sm"
                                             style={{
                                                 backgroundColor: event.color,
                                                 color: event.textColor
                                             }}
                                             title={event.title}
                                         >
-                                            {event.time && <Clock className="w-3 h-3 opacity-70" />}
-                                            {event.title}
+                                            <div className="flex-1 truncate flex items-center gap-1">
+                                                {event.time && <span className="opacity-75 font-mono text-[9px]">{event.time}</span>}
+                                                <span>{event.title}</span>
+                                            </div>
                                         </div>
                                     ))}
                                 </div>
@@ -199,6 +215,35 @@ export default function Calendar() {
                     ))}
                 </div>
 
+                {/* All Day / Jobs Section */}
+                <div className="flex border-b bg-muted/20 min-h-[40px]">
+                    <div className="w-16 border-r flex-shrink-0 flex justify-center items-center text-[10px] text-muted-foreground font-medium p-1 text-center bg-muted/5">
+                        Teslimat
+                    </div>
+                    {daysToShow.map(day => {
+                        // Filter for Job/Delivery events for this day
+                        const dayJobs = events.filter(e => isSameDay(e.date, day) && e.type === 'job');
+
+                        return (
+                            <div key={day.toString()} className="flex-1 border-r last:border-r-0 p-1 flex flex-col gap-1">
+                                {dayJobs.map(job => (
+                                    <div
+                                        key={job.id}
+                                        className="text-[10px] px-1.5 py-0.5 rounded truncate font-medium cursor-pointer shadow-sm opacity-90 hover:opacity-100 flex items-center justify-center text-center"
+                                        style={{
+                                            backgroundColor: job.color,
+                                            color: job.textColor
+                                        }}
+                                        title={job.title}
+                                    >
+                                        {job.title}
+                                    </div>
+                                ))}
+                            </div>
+                        );
+                    })}
+                </div>
+
                 {/* Time Grid (Scrollable) */}
                 <div className="flex-1 overflow-y-auto">
                     {hours.map(hour => (
@@ -210,24 +255,27 @@ export default function Calendar() {
 
                             {/* Days Columns */}
                             {daysToShow.map(day => {
-                                // Find events that start in this hour
-                                const hourEvents = events.filter(e => isSameDay(e.date, day) && e.date.getHours() === hour);
+                                // Find events that start in this hour (Projects only)
+                                const hourEvents = events.filter(e =>
+                                    isSameDay(e.date, day) &&
+                                    e.type === 'project' &&
+                                    e.date.getHours() === hour
+                                );
 
                                 return (
                                     <div key={day.toString()} className="flex-1 border-r last:border-r-0 p-1 relative hover:bg-slate-50 transition-colors">
                                         {hourEvents.map(event => (
                                             <div
                                                 key={event.id}
-                                                className="mb-1 text-xs p-1.5 rounded shadow-sm cursor-pointer hover:brightness-95 transition-all opacity-90 hover:opacity-100 z-10"
+                                                className="mb-1 text-xs p-1.5 rounded shadow-sm cursor-pointer hover:brightness-95 transition-all opacity-90 hover:opacity-100 z-10 border border-white/20"
                                                 style={{
                                                     backgroundColor: event.color,
                                                     color: event.textColor,
-                                                    // Simple positioning for overlap handling could be added here
                                                 }}
                                             >
                                                 <div className="font-bold flex items-center gap-1">
                                                     {format(event.date, 'HH:mm')}
-                                                    {event.type === 'job' && <Clock className="w-3 h-3" />}
+                                                    <Clock className="w-3 h-3 opacity-50" />
                                                 </div>
                                                 <div className="truncate">{event.title}</div>
                                             </div>

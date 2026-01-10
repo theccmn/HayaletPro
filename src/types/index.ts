@@ -12,6 +12,7 @@ export interface Project {
     phone?: string;
     email?: string;
     start_date?: string;
+    end_date?: string;
     status_id: string; // Updated to reference ProjectStatus
     details?: string;
     notes?: string;

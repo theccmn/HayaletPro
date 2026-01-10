@@ -13,6 +13,7 @@ import { Loader2, Search, Plus, Tag, Check, Package as PackageIcon, ArrowRight, 
 import { cn } from '../lib/utils';
 import type { Project, Client, Package } from '../types';
 import { useState, useEffect } from 'react';
+import { DateTimePicker } from './DateTimePicker';
 
 // Combined Schema for final submission check
 const fullSchema = z.object({
@@ -24,9 +25,9 @@ const fullSchema = z.object({
     client_tags: z.string().optional(),
 
     // Project
-    title: z.string(),
-    status_id: z.string(),
-    start_date: z.string().optional(),
+    title: z.string().min(1, "Proje başlığı zorunludur"),
+    status_id: z.string().min(1, "Durum seçiniz"),
+    start_date: z.string().optional(), // Format: "2026-01-10T10:00|2026-01-10T14:00" veya sadece "2026-01-10T10:00"
     notes: z.string().optional(),
 
     // Package
@@ -52,8 +53,6 @@ export function ProjectDialog({ isOpen, onClose, projectToEdit }: ProjectDialogP
     const [selectedClient, setSelectedClient] = useState<Client | null>(null);
     const [selectedPackage, setSelectedPackage] = useState<Package | null>(null);
     const [isNewClientMode, setIsNewClientMode] = useState(false);
-
-    // State to prevent double-click submission
     const [isReadyToSubmit, setIsReadyToSubmit] = useState(false);
 
     // Queries
@@ -68,7 +67,8 @@ export function ProjectDialog({ isOpen, onClose, projectToEdit }: ProjectDialogP
     );
 
     // Form
-    const { register, handleSubmit, reset, setValue, watch, trigger } = useForm<ProjectFormValues>({
+    const { register, handleSubmit, reset, setValue, watch, trigger, formState: { errors } } = useForm<ProjectFormValues>({
+        mode: 'onChange',
         shouldUnregister: false,
         defaultValues: {
             title: '',
@@ -87,10 +87,20 @@ export function ProjectDialog({ isOpen, onClose, projectToEdit }: ProjectDialogP
                 setSelectedClient(null);
                 setSelectedPackage(null);
                 setIsNewClientMode(false);
+                setIsReadyToSubmit(false);
                 reset();
             }, 300);
         }
     }, [isOpen, projectToEdit, reset]);
+
+    // Safety lock for Step 5
+    useEffect(() => {
+        if (step === 5) {
+            setIsReadyToSubmit(false);
+            const timer = setTimeout(() => setIsReadyToSubmit(true), 800); // 800ms delay
+            return () => clearTimeout(timer);
+        }
+    }, [step]);
 
     // Handle Edit Mode Data Population
     useEffect(() => {
@@ -98,7 +108,14 @@ export function ProjectDialog({ isOpen, onClose, projectToEdit }: ProjectDialogP
             // Populate form...
             setValue('title', projectToEdit.title);
             setValue('status_id', projectToEdit.status_id);
-            setValue('start_date', projectToEdit.start_date || '');
+
+            // Format start and end date for DateTimePicker (start|end)
+            let dateValue = projectToEdit.start_date || '';
+            if (projectToEdit.start_date && projectToEdit.end_date) {
+                dateValue = `${projectToEdit.start_date}|${projectToEdit.end_date}`;
+            }
+            setValue('start_date', dateValue);
+
             setValue('notes', projectToEdit.notes || '');
             setValue('custom_price', projectToEdit.price || 0);
             if (projectToEdit.client_name) {
@@ -106,16 +123,6 @@ export function ProjectDialog({ isOpen, onClose, projectToEdit }: ProjectDialogP
             }
         }
     }, [projectToEdit, isOpen, setValue]);
-
-    // Manage Submit Ready State for Wizard
-    useEffect(() => {
-        if (step === 5) {
-            const timer = setTimeout(() => setIsReadyToSubmit(true), 500);
-            return () => clearTimeout(timer);
-        } else {
-            setIsReadyToSubmit(false);
-        }
-    }, [step]);
 
 
     // Mutations
@@ -133,13 +140,24 @@ export function ProjectDialog({ isOpen, onClose, projectToEdit }: ProjectDialogP
                 finalClientId = newClient.id;
             }
 
-            // 2. Create Project
+            // 2. Parse date range if present
+            let startDate: string | undefined;
+            let endDate: string | undefined;
+
+            if (data.start_date) {
+                const parts = data.start_date.split('|');
+                startDate = parts[0]?.trim();
+                endDate = parts[1]?.trim();
+            }
+
+            // 3. Create Project
             const projectPayload = {
                 title: data.title,
                 status_id: data.status_id,
                 client_id: finalClientId,
                 client_name: (data.is_new_client ? data.client_name : selectedClient?.name) || "",
-                start_date: data.start_date || undefined,
+                start_date: startDate ? new Date(startDate).toISOString() : undefined,
+                end_date: endDate ? new Date(endDate).toISOString() : undefined,
                 notes: data.notes || undefined,
                 price: data.custom_price || 0,
                 // Package details could be appended to notes or tracked separately
@@ -157,11 +175,25 @@ export function ProjectDialog({ isOpen, onClose, projectToEdit }: ProjectDialogP
             queryClient.invalidateQueries({ queryKey: ['clients'] });
             onClose();
         },
-        onError: (e) => console.error(e)
+        onError: (e) => {
+            console.error(e);
+            alert("Proje oluşturulurken bir hata oluştu: " + e.message);
+        }
     });
 
     const onSubmit = (data: ProjectFormValues) => {
+        // Edit mode bypasses steps
+        if (isEditMode) {
+            mutation.mutate(data);
+            return;
+        }
+
+        // Creation mode must be on step 5
         if (step !== 5) return;
+
+        // Double check safety
+        if (!isReadyToSubmit) return;
+
         mutation.mutate(data);
     };
 
@@ -176,14 +208,23 @@ export function ProjectDialog({ isOpen, onClose, projectToEdit }: ProjectDialogP
             } else {
                 // Determine if we should force selection or allow "No Client"
                 // Assuming "No Client" is basically skipping selection
-                setStep(3);
+                alert("Lütfen bir müşteri seçin veya yeni müşteri oluşturun.");
+                return;
             }
         } else if (step === 2) {
             const valid = await trigger(['client_name', 'client_phone']);
             if (valid) setStep(3);
         } else if (step === 3) {
+            const statusId = watch('status_id');
+            if (!statusId) {
+                alert("Lütfen bir 'Durum' seçiniz.");
+                return;
+            }
+
             const valid = await trigger(['title', 'status_id']);
-            if (valid) setStep(4);
+            if (valid) {
+                setStep(4);
+            }
         } else if (step === 4) {
             setStep(5);
         }
@@ -212,7 +253,7 @@ export function ProjectDialog({ isOpen, onClose, projectToEdit }: ProjectDialogP
             <div className="h-[250px] overflow-y-auto border rounded-md p-2 space-y-2">
                 <button
                     type="button"
-                    onClick={() => { setIsNewClientMode(true); setValue('is_new_client', true); setSelectedClient(null); nextStep(); }}
+                    onClick={() => { setIsNewClientMode(true); setValue('is_new_client', true); setSelectedClient(null); setStep(2); }}
                     className="w-full flex items-center p-3 rounded-md border border-dashed hover:bg-muted/50 transition-colors text-primary"
                 >
                     <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center mr-3">
@@ -284,27 +325,36 @@ export function ProjectDialog({ isOpen, onClose, projectToEdit }: ProjectDialogP
     );
 
     const renderStep3_ProjectInfo = () => (
-        <div className="space-y-4 animate-in slide-in-from-right-4 fade-in duration-300">
+        <div className="space-y-4 animate-in slide-in-from-right-4 fade-in duration-300 max-h-[60vh] overflow-y-auto px-1">
             <div className="grid gap-2">
                 <Label>Proje Başlığı</Label>
                 <Input {...register('title')} placeholder="Örn. 2024 Yaz Kataloğu" autoFocus />
+                {errors.title && <span className="text-xs text-red-500">{errors.title.message}</span>}
             </div>
             <div className="grid grid-cols-2 gap-4">
                 <div className="grid gap-2">
                     <Label>Durum</Label>
-                    <select {...register('status_id')} className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm">
+                    <select
+                        {...register('status_id')}
+                        className={cn(
+                            "flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm",
+                            errors.status_id ? "border-red-500" : ""
+                        )}
+                    >
+                        <option value="" disabled>Seçiniz</option>
                         {statuses?.map(s => <option key={s.id} value={s.id}>{s.label}</option>)}
                     </select>
+                    {errors.status_id && <span className="text-xs text-red-500">{errors.status_id.message}</span>}
                 </div>
                 <div className="grid gap-2">
-                    <Label>Tarih</Label>
-                    <Input type="date" {...register('start_date')} />
+                    <Label>Notlar</Label>
+                    <Input {...register('notes')} placeholder="Detaylar..." />
                 </div>
             </div>
-            <div className="grid gap-2">
-                <Label>Notlar</Label>
-                <Input {...register('notes')} placeholder="Detaylar..." />
-            </div>
+            <DateTimePicker
+                value={watch('start_date')}
+                onChange={(value) => setValue('start_date', value)}
+            />
         </div>
     );
 
@@ -387,8 +437,23 @@ export function ProjectDialog({ isOpen, onClose, projectToEdit }: ProjectDialogP
                         <span className="font-medium">{formData.title}</span>
                     </div>
                     <div className="flex justify-between border-b pb-2">
-                        <span className="text-muted-foreground">Tarih</span>
-                        <span className="font-medium">{formData.start_date || 'Belirtilmedi'}</span>
+                        <span className="text-muted-foreground">Tarih / Saat</span>
+                        <span className="font-medium text-right">
+                            {formData.start_date ? (() => {
+                                const parts = formData.start_date.split('|');
+                                if (parts.length === 2) {
+                                    const start = parts[0].split('T');
+                                    const end = parts[1].split('T');
+                                    return (
+                                        <div>
+                                            <div>{start[0]}</div>
+                                            <div className="text-primary font-bold">{start[1]} - {end[1]}</div>
+                                        </div>
+                                    );
+                                }
+                                return formData.start_date;
+                            })() : 'Belirtilmedi'}
+                        </span>
                     </div>
                     <div className="flex justify-between items-center pt-2">
                         <span className="text-muted-foreground">Paket / Tutar</span>
@@ -408,52 +473,71 @@ export function ProjectDialog({ isOpen, onClose, projectToEdit }: ProjectDialogP
                 isOpen={isOpen}
                 onClose={onClose}
                 title="Projeyi Düzenle"
-                description="Mevcut proje bilgilerini güncelleyin."
+                description="Proje detaylarını buradan güncelleyebilirsiniz."
             >
-                <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 mt-4">
-                    <div className="grid gap-2">
-                        <Label>Proje Başlığı</Label>
-                        <Input {...register('title')} />
-                    </div>
+                <div className="max-h-[75vh] overflow-y-auto px-1 -mx-1">
+                    <form onSubmit={handleSubmit(onSubmit)} className="mt-6 flex flex-col gap-5 pb-4">
 
-                    <div className="grid gap-2">
-                        <Label>Müşteri</Label>
-                        <div className="text-sm font-medium p-2 border rounded bg-muted/10">
-                            {projectToEdit.client_name || 'Kayıtlı Müşteri Yok'}
+                        {/* Temel Bilgiler Grubu */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div className="space-y-1.5">
+                                <Label className="text-xs text-muted-foreground uppercase tracking-wider font-bold">Proje Başlığı</Label>
+                                <Input {...register('title')} className="h-10 font-medium" />
+                            </div>
+
+                            <div className="space-y-1.5">
+                                <Label className="text-xs text-muted-foreground uppercase tracking-wider font-bold">Müşteri</Label>
+                                <div className="flex h-10 w-full items-center rounded-md border border-input bg-muted px-3 py-2 text-sm text-muted-foreground cursor-not-allowed">
+                                    {projectToEdit.client_name || 'İsimsiz Müşteri'}
+                                </div>
+                            </div>
                         </div>
-                    </div>
 
-                    <div className="grid grid-cols-2 gap-4">
-                        <div className="grid gap-2">
-                            <Label>Durum</Label>
-                            <select {...register('status_id')} className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm">
-                                {statuses?.map(s => <option key={s.id} value={s.id}>{s.label}</option>)}
-                            </select>
+                        <div className="h-px bg-border/50" />
+
+                        {/* Durum ve Finans */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div className="space-y-1.5">
+                                <Label className="text-xs text-muted-foreground uppercase tracking-wider font-bold">Durum</Label>
+                                <select
+                                    {...register('status_id')}
+                                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                                >
+                                    {statuses?.map(s => <option key={s.id} value={s.id}>{s.label}</option>)}
+                                </select>
+                            </div>
+                            <div className="space-y-1.5">
+                                <Label className="text-xs text-muted-foreground uppercase tracking-wider font-bold">Fiyat (₺)</Label>
+                                <Input type="number" {...register('custom_price', { valueAsNumber: true })} className="h-10" />
+                            </div>
                         </div>
-                        <div className="grid gap-2">
-                            <Label>Tarih</Label>
-                            <Input type="date" {...register('start_date')} />
+
+                        {/* Zamanlama */}
+                        <div className="space-y-1.5">
+                            <Label className="text-xs text-muted-foreground uppercase tracking-wider font-bold">Tarih ve Saat Aralığı</Label>
+                            <div className="border rounded-md p-1 bg-card">
+                                <DateTimePicker
+                                    value={watch('start_date')}
+                                    onChange={(value) => setValue('start_date', value)}
+                                />
+                            </div>
                         </div>
-                    </div>
 
-                    <div className="grid gap-2">
-                        <Label>Fiyat (₺)</Label>
-                        <Input type="number" {...register('custom_price', { valueAsNumber: true })} />
-                    </div>
 
-                    <div className="grid gap-2">
-                        <Label>Notlar</Label>
-                        <Input {...register('notes')} />
-                    </div>
+                        <div className="space-y-1.5">
+                            <Label className="text-xs text-muted-foreground uppercase tracking-wider font-bold">Notlar</Label>
+                            <Input {...register('notes')} className="h-10" placeholder="Proje ile ilgili notlar..." />
+                        </div>
 
-                    <div className="flex justify-end gap-2 pt-4">
-                        <Button type="button" variant="outline" onClick={onClose}>İptal</Button>
-                        <Button type="submit" disabled={mutation.isPending}>
-                            {mutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                            Güncelle
-                        </Button>
-                    </div>
-                </form>
+                        <div className="flex justify-end gap-3 mt-2 pt-4 border-t">
+                            <Button type="button" variant="outline" onClick={onClose} className="h-10 px-6">İptal</Button>
+                            <Button type="submit" disabled={mutation.isPending} className="h-10 px-6 bg-green-600 hover:bg-green-700">
+                                {mutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                                Değişiklikleri Kaydet
+                            </Button>
+                        </div>
+                    </form>
+                </div>
             </Dialog>
         );
     }
@@ -503,10 +587,13 @@ export function ProjectDialog({ isOpen, onClose, projectToEdit }: ProjectDialogP
                             <Button
                                 type="submit"
                                 disabled={mutation.isPending || !isReadyToSubmit}
-                                className="bg-green-600 hover:bg-green-700 transition-all"
+                                className={cn(
+                                    "transition-all",
+                                    isReadyToSubmit ? "bg-green-600 hover:bg-green-700" : "bg-muted text-muted-foreground"
+                                )}
                             >
                                 {mutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                                Onayla ve Oluştur
+                                {!isReadyToSubmit ? "Lütfen bekleyin..." : "Onayla ve Oluştur"}
                             </Button>
                         )}
                     </div>
