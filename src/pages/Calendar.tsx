@@ -68,8 +68,9 @@ export default function Calendar() {
 
                     const dateObj = new Date(dateStr);
                     if (!isNaN(dateObj.getTime())) {
-                        const status = statuses?.find(s => s.id === p.status_id);
-                        const bg = status?.color || '#3b82f6';
+                        // const status = statuses?.find(s => s.id === p.status_id);
+                        // Force blue color for projects in calendar view for better visibility
+                        const bg = '#3b82f6';
 
                         allEvents.push({
                             id: p.id,
