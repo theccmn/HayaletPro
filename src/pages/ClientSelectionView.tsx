@@ -7,9 +7,20 @@ import { listDriveFiles, type DriveFile } from '../services/apiGoogleDrive';
 import { SelectionLightbox } from '../components/photo-selection/SelectionLightbox';
 import { Loader2, CheckCircle, AlertCircle, Info, RefreshCw, Download, FileText, Lock } from 'lucide-react';
 import JSZip from 'jszip';
-import { saveAs } from 'file-saver';
+// import { saveAs } from 'file-saver'; // Removed in favor of native anchor tag
 import { cn } from '../lib/utils';
 import { supabase } from '../lib/supabase';
+import { toast } from 'sonner';
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from '../components/ui/alert-dialog';
 
 export function ClientSelectionView() {
     const { token } = useParams<{ token: string }>();
@@ -22,6 +33,10 @@ export function ClientSelectionView() {
     const [isLegalApproved, setIsLegalApproved] = useState(false);
     const [localCompleted, setLocalCompleted] = useState(false);
     const [downloadProgress, setDownloadProgress] = useState<{ current: number, total: number, isDownloading: boolean } | null>(null);
+
+    // Download Dialog State
+    const [isDownloadAlertDialogOpen, setIsDownloadAlertDialogOpen] = useState(false);
+    const [pendingDownloadItems, setPendingDownloadItems] = useState<DriveFile[]>([]);
 
     // Fetch Session Data
     const { data: session, isLoading: isSessionLoading, error: sessionError } = useQuery({
@@ -81,7 +96,7 @@ export function ClientSelectionView() {
             if (newState.selected) {
                 const currentCount = Object.values(prev).filter(p => p.selected).length;
                 if (currentCount >= (session?.settings.limit || 1000)) {
-                    alert(`Maksimum ${session?.settings.limit} fotoğraf seçebilirsiniz.`);
+                    toast.error(`Maksimum ${session?.settings.limit} fotoğraf seçebilirsiniz.`);
                     return prev;
                 }
             }
@@ -104,7 +119,7 @@ export function ClientSelectionView() {
             const isCurrentlySelected = current.extraSelections?.[extraId];
 
             if (!isCurrentlySelected && currentExtraCount >= extraLimit) {
-                alert(`Bu özellik için limit doldu.`);
+                toast.error(`Bu özellik için limit doldu.`);
                 return prev;
             }
 
@@ -133,7 +148,7 @@ export function ClientSelectionView() {
         // 1. Validate Total Count
         const limit = session?.settings.limit || 0;
         if (selectedCount !== limit) {
-            alert(`Lütfen tam olarak ${limit} adet fotoğraf seçiniz. Şu an ${selectedCount} adet seçtiniz.`);
+            toast.error(`Lütfen tam olarak ${limit} adet fotoğraf seçiniz. Şu an ${selectedCount} adet seçtiniz.`);
             return;
         }
 
@@ -142,7 +157,7 @@ export function ClientSelectionView() {
         for (const limit of extraLimits) {
             const currentExtraCount = Object.values(selections).filter(p => p.extraSelections?.[limit.id]).length;
             if (currentExtraCount !== limit.limit) {
-                alert(`Lütfen ${limit.limit} adet "${limit.label}" seçimi yapınız. Şu an ${currentExtraCount} adet seçtiniz.`);
+                toast.error(`Lütfen ${limit.limit} adet "${limit.label}" seçimi yapınız. Şu an ${currentExtraCount} adet seçtiniz.`);
                 return;
             }
         }
@@ -179,24 +194,48 @@ export function ClientSelectionView() {
         }
     };
 
-    const processDownloadQueue = async (items: DriveFile[]) => {
+    const processDownloadQueue = (items: DriveFile[]) => {
         if (items.length === 0) {
-            alert("İndirilecek fotoğraf bulunamadı.");
+            toast.error("İndirilecek fotoğraf bulunamadı.");
             return;
         }
+        setPendingDownloadItems(items);
+        setIsDownloadAlertDialogOpen(true);
+    };
 
-        const proceed = window.confirm(`${items.length} adet fotoğraf ZIP olarak hazırlanıp indirilecek. Bu işlem internet hızınıza bağlı olarak biraz zaman alabilir. Lütfen pencereyi kapatmayın.\n\nDevam edilsin mi?`);
+    // Helper to sanitize filename
+    const sanitizeFilename = (name: string) => {
+        if (!name) return "download";
 
-        if (!proceed) {
-            return;
-        }
+        const trMap: Record<string, string> = {
+            'ç': 'c', 'Ç': 'C',
+            'ğ': 'g', 'Ğ': 'G',
+            'ı': 'i', 'I': 'I',
+            'İ': 'I',
+            'ö': 'o', 'Ö': 'O',
+            'ş': 's', 'Ş': 'S',
+            'ü': 'u', 'Ü': 'U'
+        };
+
+        const transliterated = name.replace(/[çÇğĞıİöÖşŞüÜ]/g, (match) => trMap[match] || match);
+        // Keep letters, numbers, dashes, underscores. Replace others with underscore.
+        const safe = transliterated.replace(/[^a-zA-Z0-9\-_]/g, '_').replace(/_+/g, '_');
+        return safe.toLowerCase() || "download";
+    };
+
+    const executeDownload = async () => {
+        setIsDownloadAlertDialogOpen(false);
+        const items = pendingDownloadItems;
 
         try {
             setDownloadProgress({ current: 0, total: items.length, isDownloading: true });
 
             const zip = new JSZip();
-            const folderName = session?.projects?.client_name || "Fotograflar";
-            const imgFolder = zip.folder(folderName);
+            const rawClientName = session?.projects?.client_name || "Fotograflar";
+            const safeClientName = sanitizeFilename(rawClientName);
+            const fileName = `${safeClientName}_secimler.zip`;
+
+            const imgFolder = zip.folder(rawClientName); // Inside zip we can keep original name
 
             for (let i = 0; i < items.length; i++) {
                 const photo = items[i];
@@ -204,14 +243,6 @@ export function ClientSelectionView() {
 
                 try {
                     // Try to fetch the image. 
-                    // We prioritize specific high-res thumbnail link if webContentLink fails CORS, 
-                    // but usually lh3 links (thumbnails) are CORS friendly.
-                    // apiGoogleDrive already sets thumbnailLink to s1920. Let's try to get s3000 for better quality if possible, 
-                    // or just use the current one.
-
-                    // NOTE: webContentLink (drive.google.com/uc...) often blocks CORS. 
-                    // thumbnailLink (lh3.googleusercontent.com...) usually allows it.
-                    // We use the thumbnailLink but try to request max resolution.
                     const fetchUrl = photo.thumbnailLink ? photo.thumbnailLink.replace(/=s\d+$/, '=s3000') : photo.webContentLink;
 
                     const response = await fetch(fetchUrl, { mode: 'cors' });
@@ -230,14 +261,27 @@ export function ClientSelectionView() {
 
             // Generate ZIP
             const content = await zip.generateAsync({ type: "blob" });
-            saveAs(content, `${folderName}_Secimler.zip`);
 
-            alert("İndirme işlemi tamamlandı. ZIP dosyasını kontrol ediniz.");
+            // Native Download Method
+            const url = window.URL.createObjectURL(content);
+            const link = document.createElement('a');
+            link.href = url;
+            link.setAttribute('download', fileName); // Explicitly set attribute
+            document.body.appendChild(link);
+
+            link.click();
+
+            // Cleanup
+            document.body.removeChild(link);
+            setTimeout(() => window.URL.revokeObjectURL(url), 2000); // 2 second timeout for safety
+
+            toast.success("İndirme işlemi tamamlandı. ZIP dosyasını kontrol ediniz.");
         } catch (error) {
             console.error("ZIP Error:", error);
-            alert("İndirme işlemi sırasında bir hata oluştu.");
+            toast.error("İndirme işlemi sırasında bir hata oluştu.");
         } finally {
             setDownloadProgress(null);
+            setPendingDownloadItems([]);
         }
     };
 
@@ -580,6 +624,25 @@ export function ClientSelectionView() {
                 extraLimits={session.settings.extra_limits}
                 isLocked={isLocked}
             />
+
+            <AlertDialog open={isDownloadAlertDialogOpen} onOpenChange={setIsDownloadAlertDialogOpen}>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>İndirme İşlemi Başlatılıyor</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            {pendingDownloadItems.length} adet fotoğraf ZIP olarak hazırlanıp indirilecek.
+                            <br /><br />
+                            Bu işlem internet hızınıza bağlı olarak zaman alabilir. Lütfen indirme tamamlanana kadar pencereyi kapatmayın.
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel>Vazgeç</AlertDialogCancel>
+                        <AlertDialogAction onClick={executeDownload}>
+                            İndirmeyi Başlat
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
         </div>
     );
 }

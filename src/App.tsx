@@ -8,12 +8,14 @@ import Inventory from './pages/Inventory';
 import Settings from './pages/Settings';
 import { ClientSelectionView } from './pages/ClientSelectionView';
 import MainLayout from './layouts/MainLayout';
+import { Toaster } from 'sonner';
 
 
 
 function App() {
   return (
     <BrowserRouter>
+      <Toaster richColors position="top-center" />
       <Routes>
         {/* Public Standalone Selection View */}
         <Route path="/select/:token" element={<ClientSelectionView />} />
