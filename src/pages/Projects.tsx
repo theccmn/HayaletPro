@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { deleteProject, getProjects, updateProjectStatus } from '../services/apiProjects';
 import type { Project } from '../types';
-import { Plus, LayoutGrid, List as ListIcon, Loader2, Calendar, MoreVertical, Pencil, Trash2, Eye, EyeOff, ArrowUpDown, ArrowUp, ArrowDown, Wallet, Settings2, Kanban as KanbanIcon, CheckCircle2, Minus, Maximize2 } from 'lucide-react';
+import { Plus, LayoutGrid, List as ListIcon, Loader2, Calendar, MoreVertical, Pencil, Trash2, Eye, EyeOff, ArrowUpDown, ArrowUp, ArrowDown, Wallet, Settings2, Kanban as KanbanIcon, CheckCircle2, ZoomIn, ZoomOut } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { useState } from 'react';
 import { cn } from '../lib/utils';
@@ -291,30 +291,44 @@ export default function Projects() {
                         </button>
                     </div>
 
-                    {/* Card Size Controls - only for grid view */}
+                    {/* Card Size Controls - Slider & Buttons */}
                     {viewMode === 'grid' && (
-                        <div className="border rounded-lg p-1 bg-background flex items-center gap-1">
-                            <button
-                                onClick={() => setCardSize('sm')}
-                                className={cn("p-2 rounded-md transition-all", cardSize === 'sm' ? "bg-muted shadow-sm" : "hover:bg-muted/50")}
-                                title="Küçük Kartlar"
-                            >
-                                <Minus className="w-4 h-4" />
-                            </button>
-                            <button
-                                onClick={() => setCardSize('md')}
-                                className={cn("p-2 rounded-md transition-all", cardSize === 'md' ? "bg-muted shadow-sm" : "hover:bg-muted/50")}
-                                title="Orta Kartlar"
-                            >
-                                <LayoutGrid className="w-4 h-4" />
-                            </button>
-                            <button
-                                onClick={() => setCardSize('lg')}
-                                className={cn("p-2 rounded-md transition-all", cardSize === 'lg' ? "bg-muted shadow-sm" : "hover:bg-muted/50")}
-                                title="Büyük Kartlar"
-                            >
-                                <Maximize2 className="w-4 h-4" />
-                            </button>
+                        <div className="flex flex-col items-center justify-center gap-1 bg-background border rounded-lg p-2 h-16 w-32 shadow-sm">
+                            <div className="w-full px-1">
+                                <input
+                                    type="range"
+                                    min="1"
+                                    max="3"
+                                    step="1"
+                                    value={cardSize === 'sm' ? 1 : cardSize === 'md' ? 2 : 3}
+                                    onChange={(e) => {
+                                        const val = parseInt(e.target.value);
+                                        setCardSize(val === 1 ? 'sm' : val === 2 ? 'md' : 'lg');
+                                    }}
+                                    className="w-full h-1.5 bg-muted rounded-lg appearance-none cursor-pointer accent-primary"
+                                />
+                            </div>
+                            <div className="flex w-full justify-between items-center px-1">
+                                <button
+                                    onClick={() => setCardSize(cardSize === 'md' ? 'sm' : cardSize === 'lg' ? 'md' : 'sm')}
+                                    disabled={cardSize === 'sm'}
+                                    className="text-muted-foreground hover:text-foreground disabled:opacity-30 transition-colors"
+                                    title="Küçült"
+                                >
+                                    <ZoomOut className="w-3.5 h-3.5" />
+                                </button>
+                                <span className="text-[10px] font-medium text-muted-foreground select-none">
+                                    {cardSize === 'sm' ? 'Küçük' : cardSize === 'md' ? 'Orta' : 'Büyük'}
+                                </span>
+                                <button
+                                    onClick={() => setCardSize(cardSize === 'sm' ? 'md' : cardSize === 'md' ? 'lg' : 'lg')}
+                                    disabled={cardSize === 'lg'}
+                                    className="text-muted-foreground hover:text-foreground disabled:opacity-30 transition-colors"
+                                    title="Büyült"
+                                >
+                                    <ZoomIn className="w-3.5 h-3.5" />
+                                </button>
+                            </div>
                         </div>
                     )}
 
