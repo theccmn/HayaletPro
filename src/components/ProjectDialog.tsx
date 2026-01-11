@@ -474,8 +474,9 @@ export function ProjectDialog({ isOpen, onClose, projectToEdit }: ProjectDialogP
                 onClose={onClose}
                 title="Projeyi Düzenle"
                 description="Proje detaylarını buradan güncelleyebilirsiniz."
+                className="max-w-4xl"
             >
-                <div className="max-h-[75vh] overflow-y-auto px-1 -mx-1">
+                <div className="max-h-[85vh] overflow-y-auto px-1 -mx-1">
                     <form onSubmit={handleSubmit(onSubmit)} className="mt-6 flex flex-col gap-5 pb-4">
 
                         {/* Temel Bilgiler Grubu */}
@@ -554,6 +555,7 @@ export function ProjectDialog({ isOpen, onClose, projectToEdit }: ProjectDialogP
                             step === 4 ? "Bir paket seçin veya fiyat belirleyin." :
                                 "Bilgileri kontrol edip onaylayın."
             }
+            className="max-w-4xl"
         >
             <div className="mt-4">
                 {/* Steps Indicator */}
