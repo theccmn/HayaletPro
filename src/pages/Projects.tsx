@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { deleteProject, getProjects, updateProjectStatus } from '../services/apiProjects';
 import type { Project } from '../types';
-import { Plus, LayoutGrid, List as ListIcon, Loader2, Calendar, MoreVertical, Pencil, Trash2, Eye, EyeOff, ArrowUpDown, ArrowUp, ArrowDown, Wallet, Settings2, Kanban as KanbanIcon, CheckCircle2, ZoomIn, ZoomOut } from 'lucide-react';
+import { Plus, LayoutGrid, List as ListIcon, Loader2, Calendar, MoreVertical, Pencil, Trash2, Eye, EyeOff, ArrowUpDown, ArrowUp, ArrowDown, Wallet, Settings2, Kanban as KanbanIcon, CheckCircle2, ZoomIn, ZoomOut, Clock } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { useState } from 'react';
 import { cn } from '../lib/utils';
@@ -407,6 +407,21 @@ export default function Projects() {
                                                     <span className="hidden xl:inline">Seçim Tamam</span>
                                                 </div>
                                             )}
+                                            {/* @ts-ignore */}
+                                            {(() => {
+                                                const sel = Array.isArray(project.photo_selections) ? project.photo_selections[0] : project.photo_selections;
+                                                const isExpired = sel?.settings?.expiration_date && new Date() > new Date(new Date(sel.settings.expiration_date).setHours(23, 59, 59, 999));
+
+                                                if (isExpired && sel?.status !== 'completed') {
+                                                    return (
+                                                        <div className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-red-100 text-red-700 text-xs font-bold border border-red-200 animate-in fade-in zoom-in" title="Seçim süresi doldu">
+                                                            <Clock className="w-3 h-3" />
+                                                            <span className="hidden xl:inline">Süre Doldu</span>
+                                                        </div>
+                                                    );
+                                                }
+                                                return null;
+                                            })()}
                                         </div>
                                         <ProjectActions
                                             project={project}

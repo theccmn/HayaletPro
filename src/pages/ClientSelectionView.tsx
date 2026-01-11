@@ -5,7 +5,9 @@ import { useQuery, useMutation } from '@tanstack/react-query';
 import { getSelectionByToken, updateSelectionData, type SelectedPhoto } from '../services/apiPhotoSelection';
 import { listDriveFiles, type DriveFile } from '../services/apiGoogleDrive';
 import { SelectionLightbox } from '../components/photo-selection/SelectionLightbox';
-import { Loader2, CheckCircle, AlertCircle, Info, RefreshCw, Download, FileText, Lock } from 'lucide-react';
+import { Loader2, CheckCircle, AlertCircle, Info, RefreshCw, Download, FileText, Lock, Clock } from 'lucide-react';
+import { format } from 'date-fns';
+import { tr } from 'date-fns/locale';
 import JSZip from 'jszip';
 // import { saveAs } from 'file-saver'; // Removed in favor of native anchor tag
 import { cn } from '../lib/utils';
@@ -306,6 +308,16 @@ export function ClientSelectionView() {
 
     const selectedCount = Object.values(selections).filter(p => p.selected).length;
     const isLocked = session.status === 'completed' || localCompleted;
+
+    // Check for expiration
+    // We compare with current time. Since expiration_date is YYYY-MM-DD, we treat it as end of that day effectively? 
+    // Usually date inputs return YYYY-MM-DD. new Date('2024-01-01') is midnight UTC or local. 
+    // Let's assume strict comparison. If today > expiration, it's expired.
+    // Ideally, expiration should encompass the entire day. 
+    // So if expiration is 2024-01-01, it expires on 2024-01-02 00:00:00?
+    // Let's set the expiration check to be: if now > end of expiration day.
+    const isExpired = session.settings.expiration_date && new Date() > new Date(new Date(session.settings.expiration_date).setHours(23, 59, 59, 999));
+
 
     // Header Rendering
     const renderHeader = () => (
@@ -610,6 +622,33 @@ export function ClientSelectionView() {
                 </div>
             )}
 
+            {/* Expired View */}
+            {!isLocked && isExpired && (
+                <div className="fixed inset-0 z-40 bg-slate-50/95 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-500 block">
+                    <div className="max-w-lg w-full bg-white rounded-3xl shadow-2xl overflow-hidden border border-red-100 text-center">
+                        <div className="bg-red-50 p-8">
+                            <div className="bg-red-100 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-4 border-4 border-white shadow-sm">
+                                <Clock size={40} className="text-red-500" />
+                            </div>
+                            <h2 className="text-2xl font-bold text-red-900 mb-2">Seçim Süresi Doldu</h2>
+                            <p className="text-red-700">Bu proje için fotoğraf seçim süresi sona ermiştir.</p>
+                        </div>
+                        <div className="p-8 space-y-4">
+                            <p className="text-slate-600 text-sm leading-relaxed">
+                                Son seçim tarihi <strong>{format(new Date(session.settings.expiration_date!), 'd MMMM yyyy, EEEE', { locale: tr })}</strong> olarak belirlenmişti.
+                                <br />
+                                Süre uzatımı için lütfen fotoğrafçınız ile iletişime geçiniz.
+                            </p>
+                            <div className="pt-4 border-t">
+                                <span className="inline-flex items-center gap-2 px-4 py-2 bg-slate-100 rounded-full text-xs font-bold text-slate-500 uppercase tracking-wide">
+                                    <Lock size={12} /> Erişim Kısıtlandı
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             <SelectionLightbox
                 photos={photos}
                 currentIndex={currentPhotoIndex}
@@ -643,6 +682,6 @@ export function ClientSelectionView() {
                     </AlertDialogFooter>
                 </AlertDialogContent>
             </AlertDialog>
-        </div>
+        </div >
     );
 }

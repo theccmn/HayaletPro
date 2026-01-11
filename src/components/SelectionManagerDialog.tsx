@@ -8,8 +8,10 @@ import { Label } from './ui/label';
 import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query';
 import { createSelection, getSelectionByProjectId, deleteSelection, updateSelectionSettings, type SelectionSettings, type ExtraLimitType } from '../services/apiPhotoSelection';
 import type { Project } from '../types';
-import { Loader2, Copy, Check, ExternalLink, Plus, Trash2, Info, RefreshCw, Pencil, X, Save } from 'lucide-react';
+import { Loader2, Copy, Check, ExternalLink, Plus, Trash2, Info, RefreshCw, Pencil, X, Save, Clock, Image as ImageIcon } from 'lucide-react';
 import { format } from 'date-fns';
+import { tr } from 'date-fns/locale';
+import { SelectionGalleryDialog } from './SelectionGalleryDialog';
 
 interface SelectionManagerDialogProps {
     isOpen: boolean;
@@ -24,6 +26,8 @@ export function SelectionManagerDialog({ isOpen, onClose, project }: SelectionMa
     const [folderId, setFolderId] = useState('');
     const [limit, setLimit] = useState(40);
     const [pin, setPin] = useState('');
+    const [expirationDate, setExpirationDate] = useState(''); // YYYY-MM-DD
+    const [isGalleryOpen, setIsGalleryOpen] = useState(false);
     const [extraLimits, setExtraLimits] = useState<ExtraLimitType[]>([
         { id: 'cover', label: 'Albüm Kapağı', limit: 1 },
         { id: 'poster', label: 'Poster', limit: 3 }
@@ -79,7 +83,8 @@ export function SelectionManagerDialog({ isOpen, onClose, project }: SelectionMa
         mutationFn: async () => {
             const settings: SelectionSettings = {
                 limit: limit,
-                extra_limits: extraLimits
+                extra_limits: extraLimits,
+                expiration_date: expirationDate || undefined
             };
             await createSelection(project!.id, folderId, settings, pin);
         },
@@ -93,7 +98,8 @@ export function SelectionManagerDialog({ isOpen, onClose, project }: SelectionMa
             if (!existingSelection) return;
             const settings: SelectionSettings = {
                 limit: limit,
-                extra_limits: extraLimits
+                extra_limits: extraLimits,
+                expiration_date: expirationDate || undefined
             };
             await updateSelectionSettings(existingSelection.id, folderId, settings, pin);
         },
@@ -135,6 +141,8 @@ export function SelectionManagerDialog({ isOpen, onClose, project }: SelectionMa
         setLimit(existingSelection.settings?.limit || 40);
         // @ts-ignore
         setExtraLimits(existingSelection.settings?.extra_limits || []);
+        // @ts-ignore
+        setExpirationDate(existingSelection.settings?.expiration_date || '');
         setPin(existingSelection.access_token);
         setIsEditing(true);
     };
@@ -184,6 +192,16 @@ export function SelectionManagerDialog({ isOpen, onClose, project }: SelectionMa
                             <h3 className="text-lg font-bold text-green-900">Panel Aktif ve Çalışıyor</h3>
                             <p className="text-green-700">Müşteriniz aşağıdaki bağlantıyı kullanarak seçim yapabilir.</p>
                         </div>
+                        <div className="flex gap-2">
+                            {/* View Selections Button */}
+                            <Button
+                                onClick={() => setIsGalleryOpen(true)}
+                                className="bg-indigo-600 hover:bg-indigo-700 text-white"
+                            >
+                                <ImageIcon size={18} className="mr-2" />
+                                Seçimleri İncele
+                            </Button>
+                        </div>
                     </div>
 
                     <div className="bg-slate-50 p-4 rounded-xl border">
@@ -213,9 +231,15 @@ export function SelectionManagerDialog({ isOpen, onClose, project }: SelectionMa
                             <div className="text-xs text-muted-foreground font-bold uppercase mb-1">Durum</div>
                             <div className="font-medium capitalize px-2 py-1 bg-slate-100 rounded-full inline-block text-xs truncate max-w-full" title={existingSelection.status}>{existingSelection.status}</div>
                         </div>
-                        <div className="p-4 border rounded-xl bg-white text-center">
-                            <div className="text-xs text-muted-foreground font-bold uppercase mb-1">PIN Kodu</div>
+                        <div className="p-4 border rounded-xl bg-white text-center group relative cursor-help">
+                            <div className="text-xs text-muted-foreground font-bold uppercase mb-1 flex items-center justify-center gap-1">
+                                Erişim Kodu <Info size={10} />
+                            </div>
                             <div className="font-mono font-bold text-lg">{existingSelection.access_token}</div>
+                            {/* Simple tooltip for Access Code */}
+                            <div className="absolute top-full left-1/2 -translate-x-1/2 mt-2 w-48 p-2 bg-slate-800 text-white text-[10px] rounded opacity-0 group-hover:opacity-100 transition-opacity z-10 pointer-events-none">
+                                Linkin sonundaki benzersiz koddur. Değiştirilirse eski link geçersiz olur.
+                            </div>
                         </div>
                         <div className="p-4 border rounded-xl bg-white text-center">
                             <div className="text-xs text-muted-foreground font-bold uppercase mb-1">Klasör</div>
@@ -227,10 +251,23 @@ export function SelectionManagerDialog({ isOpen, onClose, project }: SelectionMa
                             <div className="text-xs text-muted-foreground font-bold uppercase mb-1">Seçimler</div>
                             <div className="font-bold text-lg">
                                 {/* @ts-ignore */}
-                                {existingSelection.selection_data?.length || 0} / {existingSelection.settings?.limit || 40}
+                                {existingSelection.selection_data?.filter(s => s.selected).length || 0} / {existingSelection.settings?.limit || 40}
                             </div>
                         </div>
                     </div>
+
+                    {/* Deadline Info Display */}
+                    {existingSelection.settings?.expiration_date && (
+                        <div className="flex items-center gap-2 text-sm text-slate-600 bg-orange-50 p-3 rounded-lg border border-orange-100">
+                            <Clock size={16} className="text-orange-500" />
+                            <span>
+                                Son Seçim Tarihi: <strong>{format(new Date(existingSelection.settings.expiration_date), 'd MMMM yyyy', { locale: tr })}</strong>
+                            </span>
+                            {new Date(existingSelection.settings.expiration_date) < new Date() && (
+                                <span className="ml-auto text-xs font-bold text-red-600 bg-red-100 px-2 py-1 rounded">SÜRE DOLDU</span>
+                            )}
+                        </div>
+                    )}
 
                     <div className="flex justify-between pt-4 border-t items-center">
                         <Button
@@ -310,14 +347,34 @@ export function SelectionManagerDialog({ isOpen, onClose, project }: SelectionMa
                                     className="text-lg font-bold"
                                 />
                             </div>
-                            <div className="space-y-2">
-                                <Label className="font-bold text-slate-700">PIN Kodu</Label>
+                            <div className="space-y-2 group relative">
+                                <Label className="font-bold text-slate-700 flex items-center gap-2">
+                                    Erişim Kodu <Info size={12} className="text-slate-400 cursor-help" />
+                                </Label>
                                 <Input
                                     value={pin}
                                     onChange={(e) => setPin(e.target.value)}
                                     className="text-lg font-mono tracking-widest text-center bg-slate-50"
                                 />
+                                <div className="hidden group-hover:block absolute top-0 right-0 -mt-8 p-2 bg-slate-800 text-white text-xs rounded z-50 w-48">
+                                    Linkin sonundaki koddur.
+                                </div>
                             </div>
+                        </div>
+
+                        {/* Expiration Date Input */}
+                        <div className="space-y-2">
+                            <Label className="font-bold text-slate-700 flex justify-between">
+                                <span>Son Seçim Tarihi (Opsiyonel)</span>
+                                <span className="text-xs font-normal text-muted-foreground">Bu tarihten sonra panel kilitlenir</span>
+                            </Label>
+                            <Input
+                                type="date"
+                                value={expirationDate}
+                                onChange={(e) => setExpirationDate(e.target.value)}
+                                min={new Date().toISOString().split('T')[0]}
+                                className="w-full"
+                            />
                         </div>
 
                         {/* Extra Limits Section */}
@@ -398,6 +455,19 @@ export function SelectionManagerDialog({ isOpen, onClose, project }: SelectionMa
                         </div>
                     </div>
                 </div>
+            )}
+
+            {/* Selection Gallery Dialog */}
+            {existingSelection && (
+                <SelectionGalleryDialog
+                    isOpen={isGalleryOpen}
+                    onClose={() => setIsGalleryOpen(false)}
+                    folderId={existingSelection.folder_id}
+                    // @ts-ignore
+                    selectionData={existingSelection.selection_data || []}
+                    clientName={project.client_name}
+                    projectName={project.title}
+                />
             )}
         </Dialog>
     );

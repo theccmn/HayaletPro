@@ -23,6 +23,7 @@ export interface SelectedPhoto {
 export interface SelectionSettings {
     limit: number;
     extra_limits: ExtraLimitType[];
+    expiration_date?: string; // ISO String
 }
 
 export interface ExtraLimitType {
