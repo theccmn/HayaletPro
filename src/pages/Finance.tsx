@@ -1,17 +1,19 @@
 import { useQuery } from '@tanstack/react-query';
 import { getTransactions } from '../services/apiFinance';
-import { Loader2, Plus, TrendingDown, TrendingUp, Wallet } from 'lucide-react';
+import { Loader2, Plus, TrendingDown, TrendingUp, Wallet, Settings } from 'lucide-react';
 import { Button } from '../components/ui/button';
-import { format } from 'date-fns';
+import { format, isSameDay, isSameWeek, isSameMonth, isSameYear, parseISO } from 'date-fns';
 import { tr } from 'date-fns/locale';
 import { useState } from 'react';
 import { cn } from '../lib/utils';
 import { TransactionDialog } from '../components/TransactionDialog';
 import { FinanceCharts } from '../components/FinanceCharts';
+import { FinanceSettingsDialog } from '../components/FinanceSettingsDialog';
 
 export default function Finance() {
     const [isDialogOpen, setIsDialogOpen] = useState(false);
-    const [chartPeriod, setChartPeriod] = useState<'week' | 'month' | 'year'>('month');
+    const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+    const [dateFilter, setDateFilter] = useState<'day' | 'week' | 'month' | 'year' | 'all'>('month');
     const [typeFilter, setTypeFilter] = useState<'all' | 'income' | 'expense'>('all');
 
     const { data: transactions, isLoading } = useQuery({
@@ -19,20 +21,36 @@ export default function Finance() {
         queryFn: getTransactions,
     });
 
-    const totalIncome = transactions
+    const filteredTransactions = transactions?.filter(t => {
+        const date = parseISO(t.date);
+        const now = new Date();
+
+        // 1. Date Filter
+        if (dateFilter === 'day') {
+            if (!isSameDay(date, now)) return false;
+        } else if (dateFilter === 'week') {
+            if (!isSameWeek(date, now, { weekStartsOn: 1 })) return false;
+        } else if (dateFilter === 'month') {
+            if (!isSameMonth(date, now)) return false;
+        } else if (dateFilter === 'year') {
+            if (!isSameYear(date, now)) return false;
+        }
+
+        // 2. Type Filter
+        if (typeFilter !== 'all' && t.type !== typeFilter) return false;
+
+        return true;
+    });
+
+    const totalIncome = filteredTransactions
         ?.filter(t => t.type === 'income')
         .reduce((sum, t) => sum + (t.amount || 0), 0) || 0;
 
-    const totalExpense = transactions
+    const totalExpense = filteredTransactions
         ?.filter(t => t.type === 'expense')
         .reduce((sum, t) => sum + (t.amount || 0), 0) || 0;
 
     const netProfit = totalIncome - totalExpense;
-
-    const filteredTransactions = transactions?.filter(t => {
-        if (typeFilter !== 'all' && t.type !== typeFilter) return false;
-        return true;
-    });
 
     if (isLoading) {
         return (
@@ -49,9 +67,14 @@ export default function Finance() {
                     <h1 className="text-3xl font-bold tracking-tight">Finans Yönetimi</h1>
                     <p className="text-muted-foreground">Gelir, gider ve nakit akışınızı takip edin.</p>
                 </div>
-                <Button onClick={() => setIsDialogOpen(true)} className="bg-primary text-primary-foreground hover:bg-primary/90">
-                    <Plus className="mr-2 h-4 w-4" /> Yeni İşlem Ekle
-                </Button>
+                <div className="flex gap-2">
+                    <Button variant="outline" onClick={() => setIsSettingsOpen(true)}>
+                        <Settings className="mr-2 h-4 w-4" /> Ayarlar
+                    </Button>
+                    <Button onClick={() => setIsDialogOpen(true)} className="bg-primary text-primary-foreground hover:bg-primary/90">
+                        <Plus className="mr-2 h-4 w-4" /> Yeni İşlem Ekle
+                    </Button>
+                </div>
             </div>
 
             {/* Summary Cards */}
@@ -85,32 +108,36 @@ export default function Finance() {
                 </div>
             </div>
 
-            {/* Charts Section */}
+            {/* Filters & Dashboard */}
             <div className="rounded-xl border bg-card text-card-foreground shadow-sm p-6">
                 <div className="flex items-center justify-between mb-4">
-                    <h3 className="font-semibold leading-none tracking-tight">Finansal Analiz</h3>
+                    <h3 className="font-semibold leading-none tracking-tight">Finansal Rapor</h3>
                     <div className="flex items-center gap-2 bg-muted/50 p-1 rounded-lg">
-                        {(['week', 'month', 'year'] as const).map((period) => (
+                        {(['day', 'week', 'month', 'year', 'all'] as const).map((period) => (
                             <button
                                 key={period}
-                                onClick={() => setChartPeriod(period)}
+                                onClick={() => setDateFilter(period)}
                                 className={cn(
-                                    "px-3 py-1 text-xs font-medium rounded-md transition-all",
-                                    chartPeriod === period ? "bg-background shadow-sm text-foreground" : "text-muted-foreground hover:bg-background/50"
+                                    "px-3 py-1 text-xs font-medium rounded-md transition-all capitalize",
+                                    dateFilter === period ? "bg-background shadow-sm text-foreground" : "text-muted-foreground hover:bg-background/50"
                                 )}
                             >
-                                {period === 'week' ? 'Haftalık' : period === 'month' ? 'Aylık' : 'Yıllık'}
+                                {period === 'day' ? 'Günlük' :
+                                    period === 'week' ? 'Haftalık' :
+                                        period === 'month' ? 'Aylık' :
+                                            period === 'year' ? 'Yıllık' : 'Tümü'}
                             </button>
                         ))}
                     </div>
                 </div>
-                <FinanceCharts transactions={transactions || []} period={chartPeriod} />
+                {/* Pass Filtered Transactions to Charts */}
+                <FinanceCharts transactions={filteredTransactions || []} period={dateFilter} />
             </div>
 
             {/* Transactions List */}
             <div className="rounded-md border bg-card">
                 <div className="flex items-center justify-between p-4 border-b">
-                    <h3 className="font-semibold">Son İşlemler</h3>
+                    <h3 className="font-semibold">İşlem Dökümü</h3>
                     <div className="flex items-center gap-2">
                         <div className="flex items-center gap-1 bg-muted p-1 rounded-md">
                             <button
@@ -175,7 +202,7 @@ export default function Finance() {
                                         {transaction.projects?.title || '-'}
                                     </td>
                                     <td className="p-4 align-middle text-muted-foreground">
-                                        {format(new Date(transaction.date), 'd MMM yyyy', { locale: tr })}
+                                        {format(new Date(transaction.date), 'd MMM yyyy HH:mm', { locale: tr })}
                                     </td>
                                     <td className={cn(
                                         "p-4 align-middle text-right font-medium",
@@ -191,6 +218,7 @@ export default function Finance() {
             </div>
 
             <TransactionDialog isOpen={isDialogOpen} onClose={() => setIsDialogOpen(false)} />
+            <FinanceSettingsDialog isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} />
         </div>
     );
 }

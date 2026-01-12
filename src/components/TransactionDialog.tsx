@@ -9,7 +9,9 @@ import { getProjects } from '../services/apiProjects';
 import { getStatuses } from '../services/apiStatuses';
 import { Dialog as CustomDialog } from './ui/dialog';
 import { cn } from '../lib/utils';
-import { ArrowDownCircle, ArrowUpCircle, Search } from 'lucide-react';
+import { ArrowDownCircle, ArrowUpCircle, Search, Settings } from 'lucide-react';
+import { getFinanceSettings } from '../services/apiFinance';
+import { FinanceSettingsDialog } from './FinanceSettingsDialog';
 
 interface TransactionDialogProps {
     isOpen: boolean;
@@ -17,35 +19,22 @@ interface TransactionDialogProps {
     defaultProjectId?: string;
 }
 
-const EXPENSE_CATEGORIES = [
-    'Ekipman',
-    'Ulaşım',
-    'Yemek',
-    'Maaş',
-    'Ofis',
-    'Yazılım',
-    'Diğer'
-];
-
-const INCOME_CATEGORIES = [
-    'Proje Ödemesi',
-    'Danışmanlık',
-    'Ek Hizmet',
-    'Diğer'
-];
+// Hardcoded lists removed in favor of dynamic settings
 
 export function TransactionDialog({ isOpen, onClose, defaultProjectId }: TransactionDialogProps) {
+    const [isSettingsOpen, setIsSettingsOpen] = useState(false);
     const [type, setType] = useState<'income' | 'expense'>('income');
     const [title, setTitle] = useState('');
     const [amount, setAmount] = useState('');
-    const [category, setCategory] = useState(INCOME_CATEGORIES[0]);
+    const [category, setCategory] = useState('');
+    const [paymentMethod, setPaymentMethod] = useState('');
     const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
+    const [time, setTime] = useState(new Date().toTimeString().slice(0, 5));
     const [projectId, setProjectId] = useState<string>('none');
 
     // Job/Delivery Date States
     const [hasJobDate, setHasJobDate] = useState(false);
     const [jobDate, setJobDate] = useState(new Date().toISOString().split('T')[0]);
-    const [jobTime, setJobTime] = useState('09:00');
 
     // Project filtering states
     const [projectSearch, setProjectSearch] = useState('');
@@ -62,6 +51,27 @@ export function TransactionDialog({ isOpen, onClose, defaultProjectId }: Transac
         queryKey: ['statuses'],
         queryFn: getStatuses,
     });
+
+    const { data: incomeCategories } = useQuery({ queryKey: ['settings', 'income_category'], queryFn: () => getFinanceSettings('income_category') });
+    const { data: expenseCategories } = useQuery({ queryKey: ['settings', 'expense_category'], queryFn: () => getFinanceSettings('expense_category') });
+    const { data: paymentMethods } = useQuery({ queryKey: ['settings', 'payment_method'], queryFn: () => getFinanceSettings('payment_method') });
+
+    const currentCategories = type === 'income' ? incomeCategories : expenseCategories;
+
+    // Set default category and payment method when data loads or type changes
+    useEffect(() => {
+        if (currentCategories && currentCategories.length > 0 && !category) {
+            setCategory(currentCategories[0].label);
+        } else if (currentCategories && currentCategories.length > 0 && !currentCategories.find(c => c.label === category)) {
+            setCategory(currentCategories[0].label);
+        }
+    }, [currentCategories, category, type]);
+
+    useEffect(() => {
+        if (paymentMethods && paymentMethods.length > 0 && !paymentMethod) {
+            setPaymentMethod(paymentMethods[0].label);
+        }
+    }, [paymentMethods, paymentMethod]);
 
     // Set default project ID when dialog opens
     useEffect(() => {
@@ -82,12 +92,13 @@ export function TransactionDialog({ isOpen, onClose, defaultProjectId }: Transac
             setAmount('');
             setType('income');
             setDate(new Date().toISOString().split('T')[0]);
+            setPaymentMethod(paymentMethods?.[0]?.label || '');
             setProjectId('none');
             setProjectSearch('');
             setStatusFilter('all');
             setHasJobDate(false);
             setJobDate(new Date().toISOString().split('T')[0]);
-            setJobTime('09:00');
+            // setJobTime removed - handled with default
         },
     });
 
@@ -101,34 +112,32 @@ export function TransactionDialog({ isOpen, onClose, defaultProjectId }: Transac
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
 
-        // Calculate job_date if specified
+        // Calculate job_date if specified (always set time to 09:00 for consistency)
         let finalJobDate: string | undefined = undefined;
         if (type === 'income' && hasJobDate) {
-            finalJobDate = `${jobDate}T${jobTime}:00`;
+            finalJobDate = `${jobDate}T09:00:00`;
         }
 
+        // Use category as title if title is empty
+        const finalTitle = title.trim() || category;
+
         const transaction: NewTransaction = {
-            title,
+            title: finalTitle,
             amount: parseFloat(amount),
             type,
             category,
-            date,
+            payment_method: paymentMethod as any,
+            date: `${date}T${time}:00`,
             project_id: projectId === 'none' ? null : projectId,
             job_date: finalJobDate,
         };
         createMutation.mutate(transaction);
     };
 
-    const categories = type === 'expense' ? EXPENSE_CATEGORIES : INCOME_CATEGORIES;
-
     // Reset category when type changes if current category is not in list
     const handleTypeChange = (newType: 'income' | 'expense') => {
         setType(newType);
-        if (newType === 'expense') {
-            setCategory(EXPENSE_CATEGORIES[0]);
-        } else {
-            setCategory(INCOME_CATEGORIES[0]);
-        }
+        // Category update handled by useEffect
     };
 
     return (
@@ -171,13 +180,12 @@ export function TransactionDialog({ isOpen, onClose, defaultProjectId }: Transac
 
                 {/* Common Fields */}
                 <div className="grid gap-2">
-                    <Label htmlFor="title">Açıklama</Label>
+                    <Label htmlFor="title">Açıklama (Opsiyonel)</Label>
                     <Input
                         id="title"
                         value={title}
                         onChange={(e) => setTitle(e.target.value)}
                         placeholder={type === 'income' ? "Örn: Proje Ön Ödemesi" : "Örn: Kamera Kiralama"}
-                        required
                     />
                 </div>
 
@@ -270,16 +278,6 @@ export function TransactionDialog({ isOpen, onClose, defaultProjectId }: Transac
                                         className="h-8"
                                     />
                                 </div>
-                                <div className="grid gap-1.5">
-                                    <Label htmlFor="jobTime" className="text-xs">Saat</Label>
-                                    <Input
-                                        id="jobTime"
-                                        type="time"
-                                        value={jobTime}
-                                        onChange={(e) => setJobTime(e.target.value)}
-                                        className="h-8"
-                                    />
-                                </div>
                             </div>
                         )}
                         <p className="text-[10px] text-muted-foreground ml-6">
@@ -289,7 +287,19 @@ export function TransactionDialog({ isOpen, onClose, defaultProjectId }: Transac
                 )}
 
                 <div className="grid gap-2">
-                    <Label htmlFor="category">Kategori</Label>
+                    <div className="flex items-center justify-between">
+                        <Label htmlFor="category">Kategori</Label>
+                        <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            className="h-6 text-xs text-muted-foreground hover:text-primary"
+                            onClick={() => setIsSettingsOpen(true)}
+                        >
+                            <Settings className="w-3 h-3 mr-1" />
+                            Düzenle
+                        </Button>
+                    </div>
                     <div className="relative">
                         <select
                             id="category"
@@ -297,9 +307,9 @@ export function TransactionDialog({ isOpen, onClose, defaultProjectId }: Transac
                             onChange={(e) => setCategory(e.target.value)}
                             className="flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 appearance-none"
                         >
-                            {categories.map((cat) => (
-                                <option key={cat} value={cat}>
-                                    {cat}
+                            {currentCategories?.map((cat) => (
+                                <option key={cat.id} value={cat.label}>
+                                    {cat.label}
                                 </option>
                             ))}
                         </select>
@@ -307,14 +317,44 @@ export function TransactionDialog({ isOpen, onClose, defaultProjectId }: Transac
                 </div>
 
                 <div className="grid gap-2">
-                    <Label htmlFor="date">Tarih</Label>
-                    <Input
-                        id="date"
-                        type="date"
-                        value={date}
-                        onChange={(e) => setDate(e.target.value)}
-                        required
-                    />
+                    <Label htmlFor="paymentMethod">Gelir Şekli</Label>
+                    <div className="relative">
+                        <select
+                            id="paymentMethod"
+                            value={paymentMethod}
+                            onChange={(e) => setPaymentMethod(e.target.value)}
+                            className="flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 appearance-none"
+                        >
+                            {paymentMethods?.map((method) => (
+                                <option key={method.id} value={method.label}>
+                                    {method.label}
+                                </option>
+                            ))}
+                        </select>
+                    </div>
+                </div>
+
+                <div className="grid grid-cols-3 gap-2">
+                    <div className="col-span-2 grid gap-2">
+                        <Label htmlFor="date">Tarih</Label>
+                        <Input
+                            id="date"
+                            type="date"
+                            value={date}
+                            onChange={(e) => setDate(e.target.value)}
+                            required
+                        />
+                    </div>
+                    <div className="grid gap-2">
+                        <Label htmlFor="time">Saat</Label>
+                        <Input
+                            id="time"
+                            type="time"
+                            value={time}
+                            onChange={(e) => setTime(e.target.value)}
+                            required
+                        />
+                    </div>
                 </div>
 
                 <div className="flex justify-end gap-2 pt-4">
@@ -330,6 +370,7 @@ export function TransactionDialog({ isOpen, onClose, defaultProjectId }: Transac
                     </Button>
                 </div>
             </form>
-        </CustomDialog>
+            <FinanceSettingsDialog isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} />
+        </CustomDialog >
     );
 }

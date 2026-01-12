@@ -29,6 +29,7 @@ export interface Transaction {
     amount: number;
     category: string;
     type: 'income' | 'expense';
+    payment_method?: string;
     date: string;
     project_id?: string | null;
     job_date?: string;
@@ -93,3 +94,13 @@ export interface Expense {
         title: string;
     } | null;
 }
+export interface FinanceSetting {
+    id: string;
+    type: 'income_category' | 'expense_category' | 'payment_method';
+    label: string;
+    order_index: number;
+    is_visible: boolean;
+    created_at?: string;
+}
+
+export type NewFinanceSetting = Omit<FinanceSetting, 'id' | 'created_at'>;
