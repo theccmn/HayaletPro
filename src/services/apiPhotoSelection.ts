@@ -135,3 +135,14 @@ export const updateSelectionSettings = async (selectionId: string, folderId: str
 
     if (error) throw error;
 };
+
+// Admin: Update selection status (e.g. for unlocking)
+export const updateSelectionStatus = async (selectionId: string, status: string) => {
+    const { error } = await supabase
+        .from('photo_selections')
+        .update({ status: status, updated_at: new Date().toISOString() })
+        .eq('id', selectionId);
+
+    if (error) throw error;
+};
+

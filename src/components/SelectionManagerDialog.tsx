@@ -6,9 +6,9 @@ import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query';
-import { createSelection, getSelectionByProjectId, deleteSelection, updateSelectionSettings, type SelectionSettings, type ExtraLimitType } from '../services/apiPhotoSelection';
+import { createSelection, getSelectionByProjectId, deleteSelection, updateSelectionSettings, updateSelectionStatus, type SelectionSettings, type ExtraLimitType } from '../services/apiPhotoSelection';
 import type { Project } from '../types';
-import { Loader2, Copy, Check, ExternalLink, Plus, Trash2, Info, RefreshCw, Pencil, X, Save, Clock, Image as ImageIcon } from 'lucide-react';
+import { Loader2, Copy, Check, ExternalLink, Plus, Trash2, Info, RefreshCw, Pencil, X, Save, Clock, Image as ImageIcon, Unlock, Phone } from 'lucide-react';
 import { format } from 'date-fns';
 import { tr } from 'date-fns/locale';
 import { SelectionGalleryDialog } from './SelectionGalleryDialog';
@@ -124,6 +124,20 @@ export function SelectionManagerDialog({ isOpen, onClose, project }: SelectionMa
         }
     });
 
+    const unlockMutation = useMutation({
+        mutationFn: async () => {
+            if (!existingSelection) return;
+            await updateSelectionStatus(existingSelection.id, 'selecting');
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['selection', project?.id] });
+            queryClient.invalidateQueries({ queryKey: ['projects'] });
+        },
+        onError: (error) => {
+            alert('İşlem başarısız: ' + (error as Error).message);
+        }
+    });
+
 
 
     const handleSave = () => {
@@ -193,6 +207,21 @@ export function SelectionManagerDialog({ isOpen, onClose, project }: SelectionMa
                             <p className="text-green-700">Müşteriniz aşağıdaki bağlantıyı kullanarak seçim yapabilir.</p>
                         </div>
                         <div className="flex gap-2">
+                            {/* Unlock Button for Completed Selections */}
+                            {existingSelection.status === 'completed' && (
+                                <Button
+                                    onClick={() => {
+                                        if (window.confirm('Seçim kilidini kaldırmak istiyor musunuz? Müşteri tekrar seçim yapabilecek.')) {
+                                            unlockMutation.mutate();
+                                        }
+                                    }}
+                                    variant="outline"
+                                    className="bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100"
+                                >
+                                    <Unlock size={18} className="mr-2" />
+                                    Kilidi Kaldır
+                                </Button>
+                            )}
                             {/* View Selections Button */}
                             <Button
                                 onClick={() => setIsGalleryOpen(true)}
@@ -308,6 +337,13 @@ export function SelectionManagerDialog({ isOpen, onClose, project }: SelectionMa
                             <div className="space-y-1.5">
                                 <Label className="text-xs text-muted-foreground uppercase">Müşteri</Label>
                                 <div className="p-2 bg-slate-50 border rounded-md text-sm font-medium">{project.client_name}</div>
+                            </div>
+                            <div className="space-y-1.5">
+                                <Label className="text-xs text-muted-foreground uppercase">Telefon</Label>
+                                <div className="p-2 bg-slate-50 border rounded-md text-sm font-medium flex items-center gap-2">
+                                    <Phone size={14} className="text-muted-foreground" />
+                                    {project.phone || '-'}
+                                </div>
                             </div>
                             <div className="space-y-1.5">
                                 <Label className="text-xs text-muted-foreground uppercase">Çekim Tarihi</Label>

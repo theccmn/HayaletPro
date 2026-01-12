@@ -4,14 +4,20 @@ import type { Project } from '../types';
 export const getProjects = async () => {
     const { data, error } = await supabase
         .from('projects')
-        .select('*, photo_selections(status)')
+        .select('*, clients!projects_client_id_fkey(phone), photo_selections(status)')
         .order('created_at', { ascending: false });
 
     if (error) {
         throw new Error(error.message);
     }
 
-    return data as Project[];
+    // Map nested client phone to project phone
+    const projectsWithPhone = data.map((p: any) => ({
+        ...p,
+        phone: p.clients?.phone || p.phone
+    }));
+
+    return projectsWithPhone as Project[];
 };
 
 export const createProject = async (project: Omit<Project, 'id' | 'created_at'>) => {

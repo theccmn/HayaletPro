@@ -2,7 +2,7 @@
 import { Dialog } from './ui/dialog';
 import { Button } from './ui/button';
 import { useQuery } from '@tanstack/react-query';
-import { listDriveFiles as fetchDriveFiles, type DriveFile } from '../services/apiGoogleDrive';
+import { listDriveFiles as fetchDriveFiles } from '../services/apiGoogleDrive';
 import { Loader2, Download, Image as ImageIcon, AlertCircle } from 'lucide-react';
 import type { SelectedPhoto } from '../services/apiPhotoSelection';
 

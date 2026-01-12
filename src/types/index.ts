@@ -19,6 +19,7 @@ export interface Project {
     price?: number;
     client_id?: string | null;
     created_at?: string;
+    photo_selections?: any; // Using any to support both object and array return types from joins
 }
 
 // Transaction Interface
