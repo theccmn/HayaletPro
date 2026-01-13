@@ -1,8 +1,8 @@
 import { supabase } from "../lib/supabase";
 import type { Transaction, NewTransaction, FinanceSetting, NewFinanceSetting } from "../types";
 
-export const getTransactions = async (): Promise<Transaction[]> => {
-    const { data, error } = await supabase
+export const getTransactions = async (projectId?: string): Promise<Transaction[]> => {
+    let query = supabase
         .from('transactions')
         .select(`
             *,
@@ -11,6 +11,12 @@ export const getTransactions = async (): Promise<Transaction[]> => {
             )
         `)
         .order('date', { ascending: false });
+
+    if (projectId) {
+        query = query.eq('project_id', projectId);
+    }
+
+    const { data, error } = await query;
 
     if (error) {
         console.error('Error fetching transactions:', error);

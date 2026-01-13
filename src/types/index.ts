@@ -19,7 +19,8 @@ export interface Project {
     price?: number;
     client_id?: string | null;
     created_at?: string;
-    photo_selections?: any; // Using any to support both object and array return types from joins
+    photo_selections?: any;
+    project_installments?: Installment[]; // Added for payment tracking
 }
 
 // Transaction Interface
@@ -104,3 +105,15 @@ export interface FinanceSetting {
 }
 
 export type NewFinanceSetting = Omit<FinanceSetting, 'id' | 'created_at'>;
+
+export interface Installment {
+    id: string;
+    project_id: string;
+    amount: number;
+    due_date: string;
+    notes?: string;
+    status?: 'pending' | 'paid' | 'overdue' | 'partial'; // Calculated client-side
+    created_at?: string;
+}
+
+export type NewInstallment = Omit<Installment, 'id' | 'created_at' | 'status'>;

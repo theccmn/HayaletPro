@@ -1,5 +1,5 @@
 import { DragDropContext, Droppable, type DropResult } from '@hello-pangea/dnd';
-import type { Project, ProjectStatus } from '../types';
+import type { Project, ProjectStatus, Transaction } from '../types';
 import { KanbanColumn } from './KanbanColumn';
 import { useState, useMemo, useEffect } from 'react';
 import { updateStatusOrder } from '../services/apiStatuses';
@@ -8,14 +8,16 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 interface KanbanBoardProps {
     projects: Project[];
     statuses: ProjectStatus[];
+    transactions?: Transaction[];
     onStatusChange: (projectId: string, newStatus: string) => void;
     onEdit: (project: Project) => void;
     onDelete: (project: Project) => void;
     onAddTransaction: (project: Project) => void;
     onManageSelection: (project: Project) => void;
+    onPaymentDetails: (project: Project) => void;
 }
 
-export function KanbanBoard({ projects, statuses, onStatusChange, onEdit, onDelete, onAddTransaction, onManageSelection }: KanbanBoardProps) {
+export function KanbanBoard({ projects, statuses, transactions, onStatusChange, onEdit, onDelete, onAddTransaction, onManageSelection, onPaymentDetails }: KanbanBoardProps) {
     // We need local state for optimistic column reordering
     const [orderedStatuses, setOrderedStatuses] = useState(statuses);
 
@@ -120,10 +122,12 @@ export function KanbanBoard({ projects, statuses, onStatusChange, onEdit, onDele
                                 index={index}
                                 title={col.label}
                                 projects={projectsByStatus[col.id] || []}
+                                transactions={transactions}
                                 onEdit={onEdit}
                                 onDelete={onDelete}
                                 onAddTransaction={onAddTransaction}
                                 onManageSelection={onManageSelection}
+                                onPaymentDetails={onPaymentDetails}
                             />
                         ))}
                         {provided.placeholder}

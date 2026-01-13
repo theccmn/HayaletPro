@@ -4,16 +4,18 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { getPackages, deletePackage } from '../services/apiPackages';
 import { getSetting, updateSetting } from '../services/apiSettings';
 import { PackageDialog } from '../components/PackageDialog';
+import { ContractSettingsDialog } from '../components/ContractSettingsDialog';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
-import { Plus, Edit, Trash2, Package as PackageIcon, Settings as SettingsIcon, Database, Save, CheckCircle } from 'lucide-react';
+import { Plus, Edit, Trash2, Package as PackageIcon, Settings as SettingsIcon, Database, Save, CheckCircle, FileText } from 'lucide-react';
 import type { Package } from '../types';
 import { cn } from '../lib/utils';
 
 export default function Settings() {
-    const [activeTab, setActiveTab] = useState<'packages' | 'integrations'>('packages');
+    const [activeTab, setActiveTab] = useState<'packages' | 'integrations' | 'contract'>('packages');
     const [isDialogOpen, setIsDialogOpen] = useState(false);
+    const [isContractDialogOpen, setIsContractDialogOpen] = useState(false);
     const [itemToEdit, setItemToEdit] = useState<Package | null>(null);
 
     // Integrations State
@@ -140,6 +142,31 @@ export default function Settings() {
         </div>
     );
 
+    const renderContractTab = () => (
+        <div className="space-y-6 animate-in fade-in duration-300">
+            <div>
+                <h3 className="text-lg font-medium">Sözleşme Şablonu</h3>
+                <p className="text-sm text-muted-foreground">Proje oluştururken kullanılan sözleşme şablonunu ve görsel ayarlarını düzenleyin.</p>
+            </div>
+
+            <div className="p-6 border rounded-xl bg-card space-y-4 max-w-2xl">
+                <div className="flex items-center gap-3 mb-2">
+                    <div className="p-2 bg-amber-50 text-amber-600 rounded-lg">
+                        <FileText size={24} />
+                    </div>
+                    <div>
+                        <h4 className="font-bold">Sözleşme Şablonu Ayarları</h4>
+                        <p className="text-xs text-muted-foreground">Logo, yazı tipi, firma bilgileri ve şablon metnini düzenleyin.</p>
+                    </div>
+                </div>
+                <Button onClick={() => setIsContractDialogOpen(true)}>
+                    <FileText className="mr-2 h-4 w-4" />
+                    Şablonu Düzenle
+                </Button>
+            </div>
+        </div>
+    );
+
     return (
         <div className="flex flex-col md:flex-row gap-8 h-full">
             {/* Sidebar */}
@@ -165,18 +192,34 @@ export default function Settings() {
                     <SettingsIcon className="h-4 w-4" />
                     Entegrasyonlar
                 </button>
+                <button
+                    onClick={() => setActiveTab('contract')}
+                    className={cn(
+                        "w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors text-left",
+                        activeTab === 'contract' ? "bg-primary/10 text-primary" : "hover:bg-muted text-muted-foreground"
+                    )}
+                >
+                    <FileText className="h-4 w-4" />
+                    Sözleşme Şablonu
+                </button>
             </div>
 
             {/* Content */}
             <div className="flex-1 bg-card rounded-xl border shadow-sm p-6 min-h-[500px]">
                 {activeTab === 'packages' && renderPackagesTab()}
                 {activeTab === 'integrations' && renderIntegrationsTab()}
+                {activeTab === 'contract' && renderContractTab()}
             </div>
 
             <PackageDialog
                 isOpen={isDialogOpen}
                 onClose={() => setIsDialogOpen(false)}
                 itemToEdit={itemToEdit}
+            />
+
+            <ContractSettingsDialog
+                isOpen={isContractDialogOpen}
+                onClose={() => setIsContractDialogOpen(false)}
             />
         </div>
     );

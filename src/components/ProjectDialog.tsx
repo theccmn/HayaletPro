@@ -9,11 +9,16 @@ import { createProject, updateProject } from '../services/apiProjects';
 import { getClients, createClient } from '../services/apiClients';
 import { getPackages } from '../services/apiPackages';
 import { getStatuses } from '../services/apiStatuses';
-import { Loader2, Search, Plus, Tag, Check, Package as PackageIcon, ArrowRight, ArrowLeft } from 'lucide-react';
+import { createInstallments } from '../services/apiInstallments';
+import { getSetting } from '../services/apiSettings';
+import { getContractSettings } from '../services/apiContract';
+import { Loader2, Search, Plus, Tag, Check, Package as PackageIcon, ArrowRight, ArrowLeft, X, Printer, Calculator, FileText, Calendar } from 'lucide-react';
 import { cn } from '../lib/utils';
-import type { Project, Client, Package } from '../types';
+import type { Project, Client, Package, NewInstallment } from '../types';
 import { useState, useEffect } from 'react';
 import { DateTimePicker } from './DateTimePicker';
+import { format } from 'date-fns';
+import { tr } from 'date-fns/locale';
 
 // Combined Schema for final submission check
 const fullSchema = z.object({
@@ -53,12 +58,25 @@ export function ProjectDialog({ isOpen, onClose, projectToEdit }: ProjectDialogP
     const [selectedClient, setSelectedClient] = useState<Client | null>(null);
     const [selectedPackage, setSelectedPackage] = useState<Package | null>(null);
     const [isNewClientMode, setIsNewClientMode] = useState(false);
+    const [customFeatures, setCustomFeatures] = useState<string[]>([]);
+    const [newFeatureInput, setNewFeatureInput] = useState('');
+
+    // Payment Plan State
+    const [installments, setInstallments] = useState<NewInstallment[]>([]);
+    const [depositType, setDepositType] = useState<'percentage' | 'fixed'>('percentage');
+    const [depositValue, setDepositValue] = useState<number>(33.33);
+    const [newInstallmentAmount, setNewInstallmentAmount] = useState<number>(0);
+    const [newInstallmentDate, setNewInstallmentDate] = useState<string>('');
+    const [newInstallmentNotes, setNewInstallmentNotes] = useState<string>('');
+
+    // UI State
     const [isReadyToSubmit, setIsReadyToSubmit] = useState(false);
 
     // Queries
     const { data: statuses } = useQuery({ queryKey: ['statuses'], queryFn: getStatuses });
     const { data: clients } = useQuery({ queryKey: ['clients'], queryFn: getClients });
     const { data: packages } = useQuery({ queryKey: ['packages'], queryFn: getPackages });
+    const { data: contractSettings } = useQuery({ queryKey: ['contractSettings'], queryFn: getContractSettings });
 
     // Helper for filtered clients
     const filteredClients = clients?.filter(c =>
@@ -88,16 +106,62 @@ export function ProjectDialog({ isOpen, onClose, projectToEdit }: ProjectDialogP
                 setSelectedPackage(null);
                 setIsNewClientMode(false);
                 setIsReadyToSubmit(false);
+                setCustomFeatures([]);
+                setNewFeatureInput('');
                 reset();
             }, 300);
         }
     }, [isOpen, projectToEdit, reset]);
 
-    // Safety lock for Step 5
+    // Initial Load - Get Settings
     useEffect(() => {
-        if (step === 5) {
+        const fetchSettings = async () => {
+            const type = await getSetting('default_deposit_type');
+            if (type) setDepositType(type as any);
+            const val = await getSetting('default_deposit_value');
+            if (val) setDepositValue(parseFloat(val));
+        };
+        fetchSettings();
+    }, []);
+
+    // Calculate Total Price Helper
+    const getTotalPrice = () => {
+        const price = watch('custom_price');
+        return price || 0;
+    };
+
+    // Auto-generate deposit on Step 5 entry if empty
+    useEffect(() => {
+        if (step === 5 && installments.length === 0) {
+            const total = getTotalPrice();
+            if (total > 0) {
+                let amount = 0;
+                if (depositType === 'percentage') {
+                    amount = Math.round((total * depositValue) / 100);
+                } else {
+                    amount = Math.min(total, depositValue);
+                }
+
+                // Set default deposit date to today + 1 week (example convention)
+                const today = new Date();
+                const nextWeek = new Date(today);
+                nextWeek.setDate(today.getDate() + 7);
+
+                setInstallments([{
+                    project_id: '', // Temporary
+                    amount,
+                    due_date: new Date().toISOString().split('T')[0], // Today for deposit usually
+                    notes: 'Kapora'
+                }]);
+            }
+        }
+    }, [step]);
+
+    // Safety lock for Final Step (Step 7 now)
+    useEffect(() => {
+        if (step === 7) {
             setIsReadyToSubmit(false);
-            const timer = setTimeout(() => setIsReadyToSubmit(true), 800); // 800ms delay
+            const timer = setTimeout(() => setIsReadyToSubmit(true), 800);
             return () => clearTimeout(timer);
         }
     }, [step]);
@@ -160,8 +224,11 @@ export function ProjectDialog({ isOpen, onClose, projectToEdit }: ProjectDialogP
                 end_date: endDate ? new Date(endDate).toISOString() : undefined,
                 notes: data.notes || undefined,
                 price: data.custom_price || 0,
-                // Package details could be appended to notes or tracked separately
-                details: selectedPackage ? `Paket: ${selectedPackage.name}` : undefined
+                details: selectedPackage
+                    ? `Paket: ${selectedPackage.name}`
+                    : customFeatures.length > 0
+                        ? `Özel Paket: ${customFeatures.join(', ')}`
+                        : undefined
             };
 
             if (isEditMode && projectToEdit) {
@@ -170,7 +237,16 @@ export function ProjectDialog({ isOpen, onClose, projectToEdit }: ProjectDialogP
                 return createProject(projectPayload);
             }
         },
-        onSuccess: () => {
+        onSuccess: async (createdProject) => {
+            // Create installments if any
+            if (installments.length > 0 && createdProject) {
+                const installmentsWithProjectId = installments.map(i => ({
+                    ...i,
+                    project_id: createdProject.id
+                }));
+                await createInstallments(installmentsWithProjectId);
+            }
+
             queryClient.invalidateQueries({ queryKey: ['projects'] });
             queryClient.invalidateQueries({ queryKey: ['clients'] });
             onClose();
@@ -188,8 +264,8 @@ export function ProjectDialog({ isOpen, onClose, projectToEdit }: ProjectDialogP
             return;
         }
 
-        // Creation mode must be on step 5
-        if (step !== 5) return;
+        // Creation mode must be on step 7
+        if (step !== 7) return;
 
         // Double check safety
         if (!isReadyToSubmit) return;
@@ -226,7 +302,16 @@ export function ProjectDialog({ isOpen, onClose, projectToEdit }: ProjectDialogP
                 setStep(4);
             }
         } else if (step === 4) {
+            // Validate price
+            const price = watch('custom_price');
+            if (!price || price <= 0) {
+                if (!confirm("Fiyat girmediniz. Devam etmek istiyor musunuz?")) return;
+            }
             setStep(5);
+        } else if (step === 5) {
+            setStep(6);
+        } else if (step === 6) {
+            setStep(7);
         }
     };
 
@@ -234,6 +319,124 @@ export function ProjectDialog({ isOpen, onClose, projectToEdit }: ProjectDialogP
         if (step === 2) setStep(1);
         else if (step === 3) setStep(isNewClientMode ? 2 : 1);
         else setStep(step - 1);
+    };
+
+    // Helper functions for Payment Plan
+    const addInstallment = () => {
+        if (newInstallmentAmount <= 0) {
+            alert("Lütfen geçerli bir tutar giriniz.");
+            return;
+        }
+        if (!newInstallmentDate) {
+            alert("Lütfen tarih seçiniz.");
+            return;
+        }
+
+        setInstallments([...installments, {
+            project_id: '',
+            amount: newInstallmentAmount,
+            due_date: newInstallmentDate,
+            notes: newInstallmentNotes || 'Taksit'
+        }]);
+
+        // Reset inputs
+        setNewInstallmentAmount(0);
+        setNewInstallmentDate('');
+        setNewInstallmentNotes('');
+    };
+
+    const removeInstallment = (index: number) => {
+        const newEx = [...installments];
+        newEx.splice(index, 1);
+        setInstallments(newEx);
+    };
+
+    const formatMoney = (amount: number) => {
+        return `₺${amount.toLocaleString('tr-TR')}`;
+    };
+
+    // Contract Template Generator
+    const getContractText = () => {
+        const clientName = isNewClientMode ? watch('client_name') : selectedClient?.name || "......................................................................";
+        const clientAddress = isNewClientMode ? "" : selectedClient?.address || ".....................................................................";
+        const totalPrice = getTotalPrice();
+        const today = format(new Date(), 'd MMMM yyyy', { locale: tr });
+
+        let paymentPlanText = "";
+        installments.forEach((inst, idx) => {
+            paymentPlanText += `• ${idx + 1}. Ödeme: ${formatMoney(inst.amount)} - ${format(new Date(inst.due_date), 'd MMMM yyyy', { locale: tr })} (${inst.notes})\n`;
+        });
+
+        if (!paymentPlanText) paymentPlanText = "Peşin ödeme.";
+
+        // Delivery content (package features) - Liste halinde
+        let deliveryContent = "";
+        const features = selectedPackage ? selectedPackage.features : customFeatures;
+        if (features && features.length > 0) {
+            features.forEach((feature) => {
+                deliveryContent += `• ${feature}\n`;
+            });
+        } else {
+            deliveryContent = "Belirtilmemiş.";
+        }
+
+        // Use template from settings or fallback
+        let template = contractSettings?.template_content || `FOTOĞRAF VE VİDEO HİZMET SÖZLEŞMESİ
+
+{{FIRMA_ADRES}} adresinde mukim {{FIRMA_ADI}} ({{FIRMA_SAHIBI}}) ile {{MUSTERI_ADI}} arasında sözleşme yapılmıştır.
+
+Hizmet Bedeli: {{HIZMET_BEDELI}}
+Ödeme Planı:
+{{ODEME_PLANI}}
+
+Teslimat İçeriği:
+{{TESLIMAT_ICERIGI}}
+
+Tarih: {{TARIH}}`;
+
+        // Replace all placeholders
+        template = template
+            .replace(/\{\{MUSTERI_ADI\}\}/g, clientName || '...')
+            .replace(/\{\{MUSTERI_ADRES\}\}/g, clientAddress || '...')
+            .replace(/\{\{HIZMET_BEDELI\}\}/g, formatMoney(totalPrice))
+            .replace(/\{\{ODEME_PLANI\}\}/g, paymentPlanText)
+            .replace(/\{\{TESLIMAT_ICERIGI\}\}/g, deliveryContent)
+            .replace(/\{\{TARIH\}\}/g, today)
+            .replace(/\{\{FIRMA_ADI\}\}/g, contractSettings?.company_name || 'HAYALET FOTOĞRAF VE FİLM')
+            .replace(/\{\{FIRMA_ADRES\}\}/g, contractSettings?.company_address || 'Sakarya Mh. 1113. Sk. 3-A Şehzadeler/Manisa')
+            .replace(/\{\{FIRMA_SAHIBI\}\}/g, contractSettings?.company_owner || 'Cengiz Çimen');
+        return template;
+    };
+
+    const handlePrint = () => {
+        const printWindow = window.open('', '_blank');
+        if (printWindow) {
+            printWindow.document.write(`
+            < html >
+                    <head>
+                        <title>Sözleşme Yazdır</title>
+                        <style>
+                            body { font-family: '${contractSettings?.font_family || 'Times New Roman'}', serif; padding: 40px; line-height: 1.6; font-size: ${contractSettings?.font_size_body || 12}px; }
+                            h1 { text-align: center; font-size: 16px; margin-bottom: 20px; }
+                            h3 { font-size: 14px; margin-top: 15px; margin-bottom: 5px; }
+                            p { margin-bottom: 10px; text-align: justify; }
+                            .signature { margin-top: 50px; display: flex; justify-content: space-between; }
+                            @media print {
+                                body { padding: 0; }
+                                .no-print { display: none; }
+                            }
+                        </style>
+                    </head>
+                    <body>
+                        <pre style="font-family: inherit; white-space: pre-wrap;">${getContractText()}</pre>
+                        <script>
+                            window.onload = function() { window.print(); }
+                        </script>
+                    </body>
+                </html >
+        `);
+            printWindow.document.close();
+        }
     };
 
     // RENDERERS
@@ -360,12 +563,16 @@ export function ProjectDialog({ isOpen, onClose, projectToEdit }: ProjectDialogP
 
     const renderStep4_Packages = () => (
         <div className="space-y-4 animate-in slide-in-from-right-4 fade-in duration-300">
-            <div className="grid grid-cols-1 gap-3 max-h-[300px] overflow-y-auto">
-                <button
-                    type="button"
-                    onClick={() => { setSelectedPackage(null); setValue('custom_price', 0); }}
+            <div className="grid grid-cols-1 gap-3 max-h-[400px] overflow-y-auto">
+                <div
+                    onClick={() => {
+                        if (selectedPackage !== null) {
+                            setSelectedPackage(null);
+                            setValue('custom_price', 0);
+                        }
+                    }}
                     className={cn(
-                        "flex items-start p-4 rounded-xl border text-left transition-all",
+                        "flex items-start p-4 rounded-xl border text-left transition-all cursor-pointer",
                         selectedPackage === null ? "border-primary bg-primary/5 ring-1 ring-primary" : "border-border hover:bg-muted/50"
                     )}
                 >
@@ -374,29 +581,88 @@ export function ProjectDialog({ isOpen, onClose, projectToEdit }: ProjectDialogP
                             <PackageIcon className="h-4 w-4 mr-2" /> Özel / Paketsiz
                         </div>
                         <div className="text-sm text-muted-foreground mt-1">
-                            Kendi fiyatınızı belirleyin.
+                            Kendi fiyatınızı ve özelliklerinizi belirleyin.
                         </div>
+
                         {selectedPackage === null && (
-                            <div className="mt-2 text-sm font-medium text-primary">
-                                <Label>Fiyat (₺)</Label>
-                                <Input
-                                    type="number"
-                                    className="mt-1 w-32 bg-white"
-                                    {...register('custom_price', { valueAsNumber: true })}
-                                    onClick={(e) => e.stopPropagation()}
-                                />
+                            <div className="mt-4 space-y-4 animate-in slide-in-from-top-2">
+                                <div className="text-sm font-medium text-primary">
+                                    <Label>Fiyat (₺)</Label>
+                                    <Input
+                                        type="number"
+                                        className="mt-1 w-32 bg-white"
+                                        {...register('custom_price', { valueAsNumber: true })}
+                                        onClick={(e) => e.stopPropagation()}
+                                    />
+                                </div>
+
+                                <div className="space-y-2">
+                                    <Label>Paket Özellikleri</Label>
+                                    <div className="flex gap-2">
+                                        <Input
+                                            value={newFeatureInput}
+                                            onChange={(e) => setNewFeatureInput(e.target.value)}
+                                            placeholder="Örn. 2 Saat Çekim"
+                                            className="bg-white h-8 text-sm"
+                                            onClick={(e) => e.stopPropagation()}
+                                            onKeyDown={(e) => {
+                                                if (e.key === 'Enter') {
+                                                    e.preventDefault();
+                                                    e.stopPropagation();
+                                                    if (newFeatureInput.trim()) {
+                                                        setCustomFeatures([...customFeatures, newFeatureInput.trim()]);
+                                                        setNewFeatureInput('');
+                                                    }
+                                                }
+                                            }}
+                                        />
+                                        <Button
+                                            type="button"
+                                            size="sm"
+                                            className="h-8"
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                if (newFeatureInput.trim()) {
+                                                    setCustomFeatures([...customFeatures, newFeatureInput.trim()]);
+                                                    setNewFeatureInput('');
+                                                }
+                                            }}
+                                        >
+                                            Ekle
+                                        </Button>
+                                    </div>
+
+                                    {customFeatures.length > 0 && (
+                                        <div className="flex flex-wrap gap-2 mt-2">
+                                            {customFeatures.map((feature, index) => (
+                                                <div key={index} className="flex items-center gap-1 bg-white border rounded px-2 py-1 text-sm shadow-sm">
+                                                    <span>{feature}</span>
+                                                    <button
+                                                        type="button"
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            setCustomFeatures(customFeatures.filter((_, i) => i !== index));
+                                                        }}
+                                                        className="text-muted-foreground hover:text-red-500"
+                                                    >
+                                                        <X className="h-3 w-3" />
+                                                    </button>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
                             </div>
                         )}
                     </div>
-                </button>
+                </div>
 
                 {packages?.map(pkg => (
-                    <button
+                    <div
                         key={pkg.id}
-                        type="button"
                         onClick={() => { setSelectedPackage(pkg); setValue('custom_price', pkg.price); setValue('package_id', pkg.id); }}
                         className={cn(
-                            "flex items-start p-4 rounded-xl border text-left transition-all",
+                            "flex items-start p-4 rounded-xl border text-left transition-all cursor-pointer",
                             selectedPackage?.id === pkg.id ? "border-primary bg-primary/5 ring-1 ring-primary" : "border-border hover:bg-muted/50"
                         )}
                     >
@@ -414,13 +680,146 @@ export function ProjectDialog({ isOpen, onClose, projectToEdit }: ProjectDialogP
                                 </div>
                             )}
                         </div>
-                    </button>
+                    </div>
                 ))}
             </div>
         </div>
     );
 
-    const renderStep5_Summary = () => {
+    const renderStep5_PaymentPlan = () => {
+        const totalPrice = getTotalPrice();
+        const totalPlanned = installments.reduce((acc, curr) => acc + curr.amount, 0);
+        const remaining = totalPrice - totalPlanned;
+
+        return (
+            <div className="space-y-6 animate-in slide-in-from-right-4 fade-in duration-300">
+                <div className="flex justify-between items-center p-4 bg-muted/20 rounded-lg border">
+                    <div>
+                        <div className="text-sm text-muted-foreground">Toplam Tutar</div>
+                        <div className="text-2xl font-bold text-primary">{formatMoney(totalPrice)}</div>
+                    </div>
+                    <div className="text-right">
+                        <div className="text-sm text-muted-foreground">Planlanan</div>
+                        <div className={cn("text-xl font-semibold", remaining === 0 ? "text-green-600" : "text-amber-600")}>
+                            {formatMoney(totalPlanned)}
+                        </div>
+                        {remaining !== 0 && (
+                            <div className="text-xs text-red-500 font-medium">Kalan: {formatMoney(remaining)}</div>
+                        )}
+                    </div>
+                </div>
+
+                <div className="space-y-4">
+                    <Label className="font-semibold flex items-center gap-2">
+                        <Calculator className="w-4 h-4" /> Ödeme Planı Oluştur
+                    </Label>
+
+                    {/* Add Installment Form */}
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-3 items-end p-3 border rounded-lg bg-card">
+                        <div className="md:col-span-1">
+                            <Label className="text-xs mb-1.5 block">Tutar</Label>
+                            <Input
+                                type="number"
+                                value={newInstallmentAmount || ''}
+                                onChange={e => setNewInstallmentAmount(parseFloat(e.target.value))}
+                                placeholder="0.00"
+                            />
+                        </div>
+                        <div className="md:col-span-1">
+                            <Label className="text-xs mb-1.5 block">Tarih</Label>
+                            <div className="relative">
+                                <Input
+                                    type="date"
+                                    value={newInstallmentDate}
+                                    onChange={e => setNewInstallmentDate(e.target.value)}
+                                    className="block"
+                                />
+                            </div>
+                        </div>
+                        <div className="md:col-span-1">
+                            <Label className="text-xs mb-1.5 block">Not / Açıklama</Label>
+                            <Input
+                                value={newInstallmentNotes}
+                                onChange={e => setNewInstallmentNotes(e.target.value)}
+                                placeholder="Örn: 2. Taksit"
+                            />
+                        </div>
+                        <div className="md:col-span-1">
+                            <Button type="button" onClick={addInstallment} className="w-full" disabled={!newInstallmentAmount || !newInstallmentDate}>
+                                <Plus className="w-4 h-4 mr-1" /> Ekle
+                            </Button>
+                        </div>
+                    </div>
+
+                    {/* Installments List */}
+                    <div className="space-y-2 max-h-[250px] overflow-y-auto">
+                        {installments.length === 0 ? (
+                            <div className="text-center p-8 border border-dashed rounded-lg text-muted-foreground text-sm">
+                                Henüz taksit eklenmedi. Toplam tutarı taksitlendirmek için yukarıdan ekleme yapın.
+                            </div>
+                        ) : (
+                            installments.map((inst, idx) => (
+                                <div key={idx} className="flex items-center justify-between p-3 bg-white border rounded-lg shadow-sm">
+                                    <div className="flex items-center gap-3">
+                                        <div className="w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center text-xs font-bold text-primary">
+                                            {idx + 1}
+                                        </div>
+                                        <div>
+                                            <div className="font-semibold">{formatMoney(inst.amount)}</div>
+                                            <div className="text-xs text-muted-foreground flex items-center gap-1">
+                                                <Calendar className="w-3 h-3" />
+                                                {format(new Date(inst.due_date), 'd MMMM yyyy', { locale: tr })}
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div className="flex items-center gap-3">
+                                        <div className="text-sm font-medium text-muted-foreground">{inst.notes}</div>
+                                        <Button
+                                            type="button"
+                                            variant="ghost"
+                                            size="icon"
+                                            onClick={() => removeInstallment(idx)}
+                                            className="h-8 w-8 text-red-500 hover:text-red-700 hover:bg-red-50"
+                                        >
+                                            <X className="w-4 h-4" />
+                                        </Button>
+                                    </div>
+                                </div>
+                            ))
+                        )}
+                    </div>
+                </div>
+            </div>
+        );
+    };
+
+    const renderStep6_Contract = () => {
+        return (
+            <div className="space-y-4 animate-in slide-in-from-right-4 fade-in duration-300">
+                <div className="flex justify-between items-center mb-2">
+                    <Label className="font-semibold flex items-center gap-2">
+                        <FileText className="w-4 h-4" /> Sözleşme Önizleme
+                    </Label>
+                    <Button type="button" variant="outline" size="sm" onClick={handlePrint} className="gap-2">
+                        <Printer className="w-4 h-4" /> Yazdır
+                    </Button>
+                </div>
+
+                <div className="border rounded-md p-6 bg-white h-[400px] overflow-y-auto shadow-inner text-xs md:text-sm font-serif whitespace-pre-wrap leading-relaxed">
+                    {getContractText()}
+                </div>
+
+                <div className="flex items-start gap-2 p-3 bg-blue-50 text-blue-700 rounded-md text-xs">
+                    <div className="mt-0.5"><Check className="w-4 h-4" /></div>
+                    <div>
+                        Sözleşme taslağı yukarıdaki gibidir. Yazdır butonunu kullanarak çıktısını alabilir ve müşteriye imzalatabilirsiniz. Proje oluşturulduktan sonra da sözleşmeye erişebilirsiniz.
+                    </div>
+                </div>
+            </div>
+        );
+    };
+
+    const renderStep7_Summary = () => {
         const formData = watch();
         return (
             <div className="space-y-6 animate-in slide-in-from-right-4 fade-in duration-300">
@@ -459,9 +858,35 @@ export function ProjectDialog({ isOpen, onClose, projectToEdit }: ProjectDialogP
                         <span className="text-muted-foreground">Paket / Tutar</span>
                         <div className="text-right">
                             <div className="font-bold text-lg text-primary">₺{formData.custom_price?.toLocaleString('tr-TR')}</div>
-                            {selectedPackage && <div className="text-xs text-muted-foreground">{selectedPackage.name}</div>}
+                            {selectedPackage ? (
+                                <div className="text-xs text-muted-foreground">{selectedPackage.name}</div>
+                            ) : customFeatures.length > 0 ? (
+                                <div className="text-xs text-muted-foreground">
+                                    <div className="font-medium mb-1">Özel Paket Özellikleri:</div>
+                                    <ul className="list-disc list-inside">
+                                        {customFeatures.map((f, i) => (
+                                            <li key={i}>{f}</li>
+                                        ))}
+                                    </ul>
+                                </div>
+                            ) : (
+                                <div className="text-xs text-muted-foreground">Özel / Paketsiz</div>
+                            )}
                         </div>
                     </div>
+                    {installments.length > 0 && (
+                        <div className="pt-2 border-t mt-2">
+                            <span className="text-xs font-semibold text-muted-foreground block mb-2">Ödeme Planı</span>
+                            <div className="space-y-1">
+                                {installments.map((inst, idx) => (
+                                    <div key={idx} className="flex justify-between text-xs">
+                                        <span>{idx + 1}. {inst.notes} ({format(new Date(inst.due_date), 'dd.MM.yyyy')})</span>
+                                        <span className="font-medium">{formatMoney(inst.amount)}</span>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
                 </div>
             </div>
         );
@@ -547,20 +972,23 @@ export function ProjectDialog({ isOpen, onClose, projectToEdit }: ProjectDialogP
         <Dialog
             isOpen={isOpen}
             onClose={onClose}
-            title={`Yeni Proje - Adım ${step}/5`}
+            title={`Yeni Proje - Adım ${step}/7`
+            }
             description={
                 step === 1 ? "Müşteri seçin veya yeni oluşturun." :
                     step === 2 ? "Yeni müşteri detaylarını girin." :
                         step === 3 ? "Proje detaylarını girin." :
                             step === 4 ? "Bir paket seçin veya fiyat belirleyin." :
-                                "Bilgileri kontrol edip onaylayın."
+                                step === 5 ? "Ödeme planını oluşturun." :
+                                    step === 6 ? "Sözleşmeyi inceleyin ve yazdırın." :
+                                        "Bilgileri kontrol edip onaylayın."
             }
             className="max-w-4xl"
         >
             <div className="mt-4">
                 {/* Steps Indicator */}
                 <div className="flex gap-1 mb-6">
-                    {[1, 2, 3, 4, 5].map(s => (
+                    {[1, 2, 3, 4, 5, 6, 7].map(s => (
                         <div key={s} className={cn("h-1 flex-1 rounded-full transition-all", s <= step ? "bg-primary" : "bg-muted")} />
                     ))}
                 </div>
@@ -570,7 +998,9 @@ export function ProjectDialog({ isOpen, onClose, projectToEdit }: ProjectDialogP
                     {step === 2 && renderStep2_NewClient()}
                     {step === 3 && renderStep3_ProjectInfo()}
                     {step === 4 && renderStep4_Packages()}
-                    {step === 5 && renderStep5_Summary()}
+                    {step === 5 && renderStep5_PaymentPlan()}
+                    {step === 6 && renderStep6_Contract()}
+                    {step === 7 && renderStep7_Summary()}
 
                     <div className="flex justify-between mt-6 pt-4 border-t">
                         {step > 1 ? (
@@ -581,7 +1011,7 @@ export function ProjectDialog({ isOpen, onClose, projectToEdit }: ProjectDialogP
                             <Button type="button" variant="ghost" onClick={onClose}>İptal</Button>
                         )}
 
-                        {step < 5 ? (
+                        {step < 7 ? (
                             <Button type="button" onClick={nextStep} disabled={step === 1 && !selectedClient && !isNewClientMode}>
                                 İleri <ArrowRight className="ml-2 h-4 w-4" />
                             </Button>
@@ -601,6 +1031,6 @@ export function ProjectDialog({ isOpen, onClose, projectToEdit }: ProjectDialogP
                     </div>
                 </form>
             </div>
-        </Dialog>
+        </Dialog >
     );
 }

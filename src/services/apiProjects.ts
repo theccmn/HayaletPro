@@ -4,7 +4,7 @@ import type { Project } from '../types';
 export const getProjects = async () => {
     const { data, error } = await supabase
         .from('projects')
-        .select('*, clients!projects_client_id_fkey(phone), photo_selections(status)')
+        .select('*, clients!projects_client_id_fkey(phone), photo_selections(status), project_installments(*)')
         .order('created_at', { ascending: false });
 
     if (error) {

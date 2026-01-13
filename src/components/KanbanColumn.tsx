@@ -1,19 +1,21 @@
 import { Droppable, Draggable } from '@hello-pangea/dnd';
-import type { Project } from '../types';
+import type { Project, Transaction } from '../types';
 import { KanbanCard } from './KanbanCard';
 
 interface KanbanColumnProps {
     id: string; // This will be the status (e.g., 'lead')
     title: string;
     projects: Project[];
+    transactions?: Transaction[];
     index: number;
     onEdit: (project: Project) => void;
     onDelete: (project: Project) => void;
     onAddTransaction: (project: Project) => void;
     onManageSelection: (project: Project) => void;
+    onPaymentDetails: (project: Project) => void;
 }
 
-export function KanbanColumn({ id, title, projects, index, onEdit, onDelete, onAddTransaction, onManageSelection }: KanbanColumnProps) {
+export function KanbanColumn({ id, title, projects, transactions, index, onEdit, onDelete, onAddTransaction, onManageSelection, onPaymentDetails }: KanbanColumnProps) {
     return (
         <Draggable draggableId={id} index={index}>
             {(provided, snapshot) => (
@@ -47,10 +49,12 @@ export function KanbanColumn({ id, title, projects, index, onEdit, onDelete, onA
                                         key={project.id}
                                         project={project}
                                         index={i}
+                                        transactions={transactions}
                                         onEdit={onEdit}
                                         onDelete={onDelete}
                                         onAddTransaction={onAddTransaction}
                                         onManageSelection={onManageSelection}
+                                        onPaymentDetails={onPaymentDetails}
                                     />
                                 ))}
                                 {provided.placeholder}

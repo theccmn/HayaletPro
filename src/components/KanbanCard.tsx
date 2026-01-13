@@ -1,5 +1,5 @@
 import { Draggable } from '@hello-pangea/dnd';
-import type { Project } from '../types';
+import type { Project, Transaction } from '../types';
 import { Calendar, MoreVertical, Pencil, Trash2, Wallet, Eye, CheckCircle2 } from 'lucide-react';
 import { format } from 'date-fns';
 import { tr } from 'date-fns/locale';
@@ -14,13 +14,21 @@ import {
 interface KanbanCardProps {
     project: Project;
     index: number;
+    transactions?: Transaction[];
     onEdit: (project: Project) => void;
     onDelete: (project: Project) => void;
     onAddTransaction: (project: Project) => void;
     onManageSelection: (project: Project) => void;
+    onPaymentDetails: (project: Project) => void;
 }
 
-export function KanbanCard({ project, index, onEdit, onDelete, onAddTransaction, onManageSelection }: KanbanCardProps) {
+export function KanbanCard({ project, index, transactions, onEdit, onDelete, onAddTransaction, onManageSelection, onPaymentDetails }: KanbanCardProps) {
+    // Calculate payment status
+    const projectIncome = transactions
+        ?.filter(t => t.type === 'income' && t.project_id === project.id)
+        .reduce((sum, t) => sum + (t.amount || 0), 0) || 0;
+    const isPaymentComplete = (project.price || 0) > 0 && projectIncome >= (project.price || 0);
+
     return (
         <Draggable draggableId={project.id} index={index}>
             {(provided, snapshot) => (
@@ -28,8 +36,10 @@ export function KanbanCard({ project, index, onEdit, onDelete, onAddTransaction,
                     ref={provided.innerRef}
                     {...provided.draggableProps}
                     {...provided.dragHandleProps}
-                    className={`bg-card text-card-foreground p-4 rounded-lg border shadow-sm hover:shadow-md transition-shadow cursor-grab active:cursor-grabbing group relative mb-3 ${snapshot.isDragging ? 'shadow-lg ring-2 ring-primary ring-opacity-50 opacity-90' : ''
-                        }`}
+                    className={`p-4 rounded-lg border shadow-sm hover:shadow-md transition-shadow cursor-grab active:cursor-grabbing group relative mb-3 ${isPaymentComplete
+                            ? 'bg-green-50/50 border-green-200 text-card-foreground'
+                            : 'bg-card text-card-foreground'
+                        } ${snapshot.isDragging ? 'shadow-lg ring-2 ring-primary ring-opacity-50 opacity-90' : ''}`}
                     style={{
                         ...provided.draggableProps.style,
                     }}
@@ -41,9 +51,15 @@ export function KanbanCard({ project, index, onEdit, onDelete, onAddTransaction,
                             </span>
                             {/* @ts-ignore */}
                             {(project.photo_selections?.status === 'completed' || (Array.isArray(project.photo_selections) && project.photo_selections[0]?.status === 'completed')) && (
-                                <div className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-green-100 text-green-700 text-xs font-bold border border-green-200 animate-in fade-in zoom-in" title="Müşteri seçimini tamamladı">
+                                <div className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 text-xs font-bold border border-blue-200 animate-in fade-in zoom-in" title="Müşteri seçimini tamamladı">
                                     <CheckCircle2 className="w-3 h-3" />
                                     <span className="text-[10px]">Seçildi</span>
+                                </div>
+                            )}
+                            {isPaymentComplete && (
+                                <div className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-green-100 text-green-700 text-xs font-bold border border-green-200 animate-in fade-in zoom-in" title="Ödeme Tamamlandı">
+                                    <CheckCircle2 className="w-3 h-3" />
+                                    <span className="text-[10px]">Ödendi</span>
                                 </div>
                             )}
                         </div>
@@ -65,6 +81,13 @@ export function KanbanCard({ project, index, onEdit, onDelete, onAddTransaction,
                                 }}>
                                     <Eye className="mr-2 h-4 w-4" />
                                     Fotoğraf Seçimi
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onClick={(e) => {
+                                    e.stopPropagation();
+                                    onPaymentDetails(project);
+                                }}>
+                                    <Wallet className="mr-2 h-4 w-4" />
+                                    Ödeme Planı
                                 </DropdownMenuItem>
                                 <DropdownMenuItem onClick={(e) => {
                                     e.stopPropagation();
