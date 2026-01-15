@@ -76,7 +76,12 @@ export function ProjectDialog({ isOpen, onClose, projectToEdit }: ProjectDialogP
     const { data: statuses } = useQuery({ queryKey: ['statuses'], queryFn: getStatuses });
     const { data: clients } = useQuery({ queryKey: ['clients'], queryFn: getClients });
     const { data: packages } = useQuery({ queryKey: ['packages'], queryFn: getPackages });
-    const { data: contractSettings } = useQuery({ queryKey: ['contractSettings'], queryFn: getContractSettings });
+    const { data: contractSettings } = useQuery({
+        queryKey: ['contractSettings'],
+        queryFn: getContractSettings,
+        staleTime: 0,
+        refetchOnMount: true
+    });
 
     // Helper for filtered clients
     const filteredClients = clients?.filter(c =>
@@ -394,52 +399,199 @@ Teslimat İçeriği:
 
 Tarih: {{TARIH}}`;
 
-        // Replace all placeholders
+        const highlightedFields = contractSettings?.highlighted_fields || [];
+
+        const wrap = (key: string, value: string) => {
+            if (highlightedFields.includes(key)) {
+                return `%%%HL%%%${value}%%%HL_END%%%`;
+            }
+            return value;
+        };
+
+        // Replace all placeholders with wrapping logic
         template = template
-            .replace(/\{\{MUSTERI_ADI\}\}/g, clientName || '...')
-            .replace(/\{\{MUSTERI_ADRES\}\}/g, clientAddress || '...')
-            .replace(/\{\{HIZMET_BEDELI\}\}/g, formatMoney(totalPrice))
-            .replace(/\{\{ODEME_PLANI\}\}/g, paymentPlanText)
-            .replace(/\{\{TESLIMAT_ICERIGI\}\}/g, deliveryContent)
-            .replace(/\{\{TARIH\}\}/g, today)
-            .replace(/\{\{FIRMA_ADI\}\}/g, contractSettings?.company_name || 'HAYALET FOTOĞRAF VE FİLM')
-            .replace(/\{\{FIRMA_ADRES\}\}/g, contractSettings?.company_address || 'Sakarya Mh. 1113. Sk. 3-A Şehzadeler/Manisa')
-            .replace(/\{\{FIRMA_SAHIBI\}\}/g, contractSettings?.company_owner || 'Cengiz Çimen');
+            .replace(/\{\{MUSTERI_ADI\}\}/g, wrap('{{MUSTERI_ADI}}', clientName || '...'))
+            .replace(/\{\{MUSTERI_ADRES\}\}/g, wrap('{{MUSTERI_ADRES}}', clientAddress || '...'))
+            .replace(/\{\{HIZMET_BEDELI\}\}/g, wrap('{{HIZMET_BEDELI}}', formatMoney(totalPrice)))
+            .replace(/\{\{ODEME_PLANI\}\}/g, wrap('{{ODEME_PLANI}}', paymentPlanText))
+            .replace(/\{\{TESLIMAT_ICERIGI\}\}/g, wrap('{{TESLIMAT_ICERIGI}}', deliveryContent))
+            .replace(/\{\{TARIH\}\}/g, wrap('{{TARIH}}', today))
+            .replace(/\{\{FIRMA_ADI\}\}/g, wrap('{{FIRMA_ADI}}', contractSettings?.company_name || 'HAYALET FOTOĞRAF VE FİLM'))
+            .replace(/\{\{FIRMA_ADRES\}\}/g, wrap('{{FIRMA_ADRES}}', contractSettings?.company_address || 'Sakarya Mh. 1113. Sk. 3-A Şehzadeler/Manisa'))
+            .replace(/\{\{FIRMA_SAHIBI\}\}/g, wrap('{{FIRMA_SAHIBI}}', contractSettings?.company_owner || 'Cengiz Çimen'));
         return template;
     };
 
     const handlePrint = () => {
         const printWindow = window.open('', '_blank');
         if (printWindow) {
+            const contractText = getContractText();
+            const highlightColor = contractSettings?.highlight_color || '#000000';
+
+            // Generate font style tag
+            const currentFontFamily = contractSettings?.font_family || 'Times New Roman';
+            let fontImport = '';
+            if (['Roboto', 'Nunito'].includes(currentFontFamily)) {
+                fontImport = `<link href="https://fonts.googleapis.com/css2?family=${currentFontFamily}:wght@300;400;500;700&display=swap" rel="stylesheet">`;
+            }
+
+            // Stateful highlight processor for HTML
+            let isHighlighted = false;
+            const processHighlights = (text: string) => {
+                const parts = text.split(/(%%%HL%%%|%%%HL_END%%%)/g);
+                return parts.map(part => {
+                    if (part === '%%%HL%%%') { isHighlighted = true; return ''; }
+                    if (part === '%%%HL_END%%%') { isHighlighted = false; return ''; }
+
+                    if (isHighlighted) {
+                        return `<span style="color: ${highlightColor}; font-weight: bold;">${part}</span>`;
+                    }
+                    return part;
+                }).join('');
+            };
+
             printWindow.document.write(`
-            < html >
+            <html>
                     <head>
-                        <title>Sözleşme Yazdır</title>
+                        <title>Sözleşme</title>
+                        <link rel="preconnect" href="https://fonts.googleapis.com">
+                        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+                        ${fontImport}
                         <style>
-                            body { font-family: '${contractSettings?.font_family || 'Times New Roman'}', serif; padding: 40px; line-height: 1.6; font-size: ${contractSettings?.font_size_body || 12}px; }
-                            h1 { text-align: center; font-size: 16px; margin-bottom: 20px; }
-                            h3 { font-size: 14px; margin-top: 15px; margin-bottom: 5px; }
-                            p { margin-bottom: 10px; text-align: justify; }
+                            body { 
+                                font-family: '${currentFontFamily}', serif; 
+                                padding: 40px; 
+                                line-height: 1.6; 
+                                font-size: ${contractSettings?.font_size_body || 12}px; 
+                                color: black;
+                            }
+                            @page { margin: 2cm; }
+                            .logo-container { text-align: center; margin-bottom: 0px; line-height: 0; padding: 0; }
+                            .logo { max-height: 100px; max-width: 250px; object-fit: contain; display: block; margin: 0 auto; }
+                            h1 { text-align: center; font-size: ${contractSettings?.font_size_title || 16}px; margin-top: 0px; margin-bottom: 20px; font-weight: bold; }
+                            h2, h3 { font-size: ${contractSettings?.font_size_heading || 14}px; margin-top: 15px; margin-bottom: 5px; font-weight: bold; }
+                            p, div { margin-bottom: 5px; text-align: justify; white-space: pre-wrap; }
                             .signature { margin-top: 50px; display: flex; justify-content: space-between; }
                             @media print {
-                                body { padding: 0; }
-                                .no-print { display: none; }
+                                body { padding: 0; -webkit-print-color-adjust: exact; }
                             }
                         </style>
                     </head>
                     <body>
-                        <pre style="font-family: inherit; white-space: pre-wrap;">${getContractText()}</pre>
+                        ${contractSettings?.logo_url ? `
+                        <div class="logo-container">
+                            <img src="${contractSettings.logo_url}" class="logo" alt="Logo" />
+                        </div>
+                        ` : ''}
+                        <div class="content">
+                            ${(() => {
+                    isHighlighted = false; // Reset for full text processing
+                    return contractText.split('\n').map((line, i) => {
+                        const trimmedLine = line.trim();
+                        const isHeader = trimmedLine.length > 0 && trimmedLine === trimmedLine.toUpperCase() && trimmedLine.length > 5 && trimmedLine.length < 100;
+                        const isMainHeader = i === 0 || trimmedLine.includes('SÖZLEŞME');
+
+                        const processedLine = processHighlights(line);
+
+                        if (isMainHeader) return `<h1>${processedLine}</h1>`;
+                        if (isHeader) return `<h3>${processedLine}</h3>`;
+                        return `<div>${processedLine}</div>`;
+                    }).join('');
+                })()}
+                        </div>
                         <script>
                             window.onload = function() { window.print(); }
                         </script>
                     </body>
-                </html >
-        `);
+            </html>
+            `);
             printWindow.document.close();
         }
     };
 
     // RENDERERS
+    const renderStep6_Contract = () => {
+        const highlightColor = contractSettings?.highlight_color || '#000000';
+
+        return (
+            <div className="space-y-4 animate-in slide-in-from-right-4 fade-in duration-300">
+                <div className="flex justify-between items-center mb-2">
+                    <Label className="font-semibold flex items-center gap-2">
+                        <FileText className="w-4 h-4" /> Sözleşme Önizleme
+                    </Label>
+                    <Button type="button" variant="outline" size="sm" onClick={handlePrint} className="gap-2">
+                        <Printer className="w-4 h-4" /> Yazdır
+                    </Button>
+                </div>
+
+                <div
+                    className="border rounded-md p-8 bg-white h-[400px] overflow-y-auto shadow-inner text-xs md:text-sm whitespace-pre-wrap leading-relaxed contract-preview"
+                    style={{
+                        fontFamily: contractSettings?.font_family || 'Times New Roman',
+                        fontSize: `${contractSettings?.font_size_body || 12}px`
+                    }}
+                >
+                    {contractSettings?.logo_url && (
+                        <div className="flex justify-center mb-6">
+                            <img
+                                src={contractSettings.logo_url}
+                                alt="Logo"
+                                className="max-h-20 max-w-[200px] object-contain"
+                            />
+                        </div>
+                    )}
+                    {(() => {
+                        let isHighlighted = false;
+                        return getContractText().split('\n').map((line, i) => {
+                            const trimmedLine = line.trim();
+                            const isHeader = trimmedLine.length > 0 && trimmedLine === trimmedLine.toUpperCase() && trimmedLine.length > 5 && trimmedLine.length < 100;
+                            const isMainHeader = i === 0 || trimmedLine.includes('SÖZLEŞME');
+
+                            // Render line with highlights
+                            const renderLineContent = (text: string) => {
+                                const parts = text.split(/(%%%HL%%%|%%%HL_END%%%)/g);
+                                return parts.map((part, idx) => {
+                                    if (part === '%%%HL%%%') { isHighlighted = true; return null; }
+                                    if (part === '%%%HL_END%%%') { isHighlighted = false; return null; }
+
+                                    if (isHighlighted) {
+                                        return <span key={idx} style={{ color: highlightColor, fontWeight: 'bold' }}>{part}</span>;
+                                    }
+                                    return <span key={idx}>{part}</span>;
+                                });
+                            };
+
+                            return (
+                                <div
+                                    key={i}
+                                    style={{
+                                        minHeight: '1.2em',
+                                        fontSize: isMainHeader ? `${contractSettings?.font_size_title || 16}px` : (isHeader ? `${contractSettings?.font_size_heading || 14}px` : undefined),
+                                        fontWeight: (isHeader || isMainHeader) ? 'bold' : 'normal',
+                                        textAlign: isMainHeader ? 'center' : 'left',
+                                        marginTop: (isHeader || isMainHeader) ? '1.5em' : '0',
+                                        marginBottom: (isHeader || isMainHeader) ? '4px' : '2px',
+                                        lineHeight: 1.5,
+                                        whiteSpace: 'pre-wrap'
+                                    }}
+                                >
+                                    {renderLineContent(line)}
+                                </div>
+                            );
+                        });
+                    })()}
+                </div>
+
+                <div className="flex items-start gap-2 p-3 bg-blue-50 text-blue-700 rounded-md text-xs">
+                    <div className="mt-0.5"><Check className="w-4 h-4" /></div>
+                    <div>
+                        Sözleşme taslağı yukarıdaki gibidir. Yazdır butonunu kullanarak çıktısını alabilir ve müşteriye imzalatabilirsiniz. Proje oluşturulduktan sonra da sözleşmeye erişebilirsiniz.
+                    </div>
+                </div>
+            </div>
+        );
+    };
+
     const renderStep1_ClientSelect = () => (
         <div className="space-y-4">
             <div className="relative">
@@ -793,31 +945,7 @@ Tarih: {{TARIH}}`;
         );
     };
 
-    const renderStep6_Contract = () => {
-        return (
-            <div className="space-y-4 animate-in slide-in-from-right-4 fade-in duration-300">
-                <div className="flex justify-between items-center mb-2">
-                    <Label className="font-semibold flex items-center gap-2">
-                        <FileText className="w-4 h-4" /> Sözleşme Önizleme
-                    </Label>
-                    <Button type="button" variant="outline" size="sm" onClick={handlePrint} className="gap-2">
-                        <Printer className="w-4 h-4" /> Yazdır
-                    </Button>
-                </div>
 
-                <div className="border rounded-md p-6 bg-white h-[400px] overflow-y-auto shadow-inner text-xs md:text-sm font-serif whitespace-pre-wrap leading-relaxed">
-                    {getContractText()}
-                </div>
-
-                <div className="flex items-start gap-2 p-3 bg-blue-50 text-blue-700 rounded-md text-xs">
-                    <div className="mt-0.5"><Check className="w-4 h-4" /></div>
-                    <div>
-                        Sözleşme taslağı yukarıdaki gibidir. Yazdır butonunu kullanarak çıktısını alabilir ve müşteriye imzalatabilirsiniz. Proje oluşturulduktan sonra da sözleşmeye erişebilirsiniz.
-                    </div>
-                </div>
-            </div>
-        );
-    };
 
     const renderStep7_Summary = () => {
         const formData = watch();

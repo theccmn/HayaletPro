@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { toast } from 'sonner';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Dialog } from './ui/dialog';
 import { Button } from './ui/button';
@@ -13,18 +14,18 @@ import {
     CONTRACT_PLACEHOLDERS,
 } from '../services/apiContract';
 import {
-    FileText,
     Upload,
     Trash2,
     Save,
     Loader2,
     Image as ImageIcon,
     Type,
-    Info,
     Copy,
-    Check
+    Check,
+    Eye,
+    Edit
 } from 'lucide-react';
-import { cn } from '../lib/utils';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
 
 interface ContractSettingsDialogProps {
     isOpen: boolean;
@@ -38,6 +39,9 @@ export function ContractSettingsDialog({ isOpen, onClose }: ContractSettingsDial
         queryKey: ['contractSettings'],
         queryFn: getContractSettings,
         enabled: isOpen,
+        staleTime: 0,
+        refetchOnMount: true,
+        refetchOnWindowFocus: false, // Prevent overwriting edits on window focus
     });
 
     // Local state for editing
@@ -53,6 +57,19 @@ export function ContractSettingsDialog({ isOpen, onClose }: ContractSettingsDial
     const [logoFile, setLogoFile] = useState<File | null>(null);
     const [logoPreview, setLogoPreview] = useState<string | null>(null);
     const [copiedPlaceholder, setCopiedPlaceholder] = useState<string | null>(null);
+    const [highlightColor, setHighlightColor] = useState('#000000');
+    const [highlightedFields, setHighlightedFields] = useState<string[]>([]);
+    const [activeTab, setActiveTab] = useState('editor');
+
+    // Mock data for preview
+    const MOCK_DATA = {
+        client: 'Cem Ceminay',
+        address: 'Güzelyurt Mh. 4500. Sk. No:5 Manisa',
+        price: '15.000 ₺',
+        plan: '• 1. Ödeme: 5.000 ₺ - 15 Ocak 2026 (Kapora)\n• 2. Ödeme: 10.000 ₺ - 15 Şubat 2026',
+        delivery: '• 2 Saat Çekim\n• 30 Düzenlenmiş Fotoğraf\n• Dijital Teslim',
+        date: new Date().toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', year: 'numeric' })
+    };
 
     // Sync state with fetched settings
     useEffect(() => {
@@ -67,6 +84,8 @@ export function ContractSettingsDialog({ isOpen, onClose }: ContractSettingsDial
             setCompanyOwner(settings.company_owner || '');
             setLogoUrl(settings.logo_url);
             setLogoPreview(settings.logo_url);
+            setHighlightColor(settings.highlight_color || '#000000');
+            setHighlightedFields(settings.highlighted_fields || []);
         }
     }, [settings]);
 
@@ -99,18 +118,25 @@ export function ContractSettingsDialog({ isOpen, onClose }: ContractSettingsDial
                 company_address: companyAddress,
                 company_owner: companyOwner,
                 logo_url: finalLogoUrl,
+                highlight_color: highlightColor,
+                highlighted_fields: highlightedFields
             });
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['contractSettings'] });
+            toast.success('Sözleşme ayarları başarıyla kaydedildi.');
             setLogoFile(null);
             onClose();
         },
+        onError: (error) => {
+            console.error('Save error:', error);
+            toast.error('Ayarlar kaydedilirken bir hata oluştu.');
+        }
     });
 
     const handleLogoSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0];
-        if (file) {
+        if (e.target.files && e.target.files[0]) {
+            const file = e.target.files[0];
             setLogoFile(file);
             const reader = new FileReader();
             reader.onloadend = () => {
@@ -120,28 +146,49 @@ export function ContractSettingsDialog({ isOpen, onClose }: ContractSettingsDial
         }
     };
 
-    const handleRemoveLogo = async () => {
-        if (logoUrl && settings?.id) {
-            try {
-                await deleteContractLogo(logoUrl);
-                await updateContractSettings(settings.id, { logo_url: null });
-                setLogoUrl(null);
-                setLogoPreview(null);
-                setLogoFile(null);
-                queryClient.invalidateQueries({ queryKey: ['contractSettings'] });
-            } catch (e) {
-                console.error('Error removing logo:', e);
-            }
-        } else {
-            setLogoPreview(null);
-            setLogoFile(null);
-        }
+    const handleRemoveLogo = () => {
+        setLogoFile(null);
+        setLogoPreview(null);
+        setLogoUrl(null);
     };
 
-    const copyPlaceholder = (placeholder: string) => {
-        navigator.clipboard.writeText(placeholder);
-        setCopiedPlaceholder(placeholder);
+    const copyToClipboard = (text: string) => {
+        navigator.clipboard.writeText(text);
+        setCopiedPlaceholder(text);
         setTimeout(() => setCopiedPlaceholder(null), 2000);
+    };
+
+    const toggleHighlightedField = (field: string) => {
+        setHighlightedFields(prev =>
+            prev.includes(field)
+                ? prev.filter(f => f !== field)
+                : [...prev, field]
+        );
+    };
+
+    const getPreviewText = () => {
+        let text = templateContent || '';
+
+        // Helper to wrap value if highlighted
+        const wrap = (key: string, value: string) => {
+            if (highlightedFields.includes(key)) {
+                return `%%%HL%%%${value}%%%HL_END%%%`;
+            }
+            return value;
+        };
+
+        text = text
+            .replace(/\{\{MUSTERI_ADI\}\}/g, wrap('{{MUSTERI_ADI}}', MOCK_DATA.client))
+            .replace(/\{\{MUSTERI_ADRES\}\}/g, wrap('{{MUSTERI_ADRES}}', MOCK_DATA.address))
+            .replace(/\{\{HIZMET_BEDELI\}\}/g, wrap('{{HIZMET_BEDELI}}', MOCK_DATA.price))
+            .replace(/\{\{ODEME_PLANI\}\}/g, wrap('{{ODEME_PLANI}}', MOCK_DATA.plan))
+            .replace(/\{\{TESLIMAT_ICERIGI\}\}/g, wrap('{{TESLIMAT_ICERIGI}}', MOCK_DATA.delivery))
+            .replace(/\{\{TARIH\}\}/g, wrap('{{TARIH}}', MOCK_DATA.date))
+            .replace(/\{\{FIRMA_ADI\}\}/g, wrap('{{FIRMA_ADI}}', companyName || 'HAYALET FOTOĞRAF VE FİLM'))
+            .replace(/\{\{FIRMA_ADRES\}\}/g, wrap('{{FIRMA_ADRES}}', companyAddress || 'Sakarya Mh. 1113. Sk. 3-A Şehzadeler/Manisa'))
+            .replace(/\{\{FIRMA_SAHIBI\}\}/g, wrap('{{FIRMA_SAHIBI}}', companyOwner || 'Cengiz Çimen'));
+
+        return text;
     };
 
     if (isLoading) {
@@ -158,211 +205,206 @@ export function ContractSettingsDialog({ isOpen, onClose }: ContractSettingsDial
         <Dialog
             isOpen={isOpen}
             onClose={onClose}
-            title="Sözleşme Şablonu Ayarları"
-            description="Sözleşme şablonunu, logo ve yazı tipi ayarlarını düzenleyin."
+            title="Sözleşme Ayarları"
             className="max-w-5xl max-h-[90vh] overflow-y-auto"
         >
             <div className="space-y-6">
-                {/* Company Info Section */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 p-4 bg-muted/30 rounded-lg border">
-                    <div>
-                        <Label htmlFor="companyName">Firma Adı</Label>
-                        <Input
-                            id="companyName"
-                            value={companyName}
-                            onChange={(e) => setCompanyName(e.target.value)}
-                            placeholder="HAYALET FOTOĞRAF VE FİLM"
-                        />
-                    </div>
-                    <div>
-                        <Label htmlFor="companyOwner">Firma Sahibi</Label>
-                        <Input
-                            id="companyOwner"
-                            value={companyOwner}
-                            onChange={(e) => setCompanyOwner(e.target.value)}
-                            placeholder="Cengiz Çimen"
-                        />
-                    </div>
-                    <div>
-                        <Label htmlFor="companyAddress">Firma Adresi</Label>
-                        <Input
-                            id="companyAddress"
-                            value={companyAddress}
-                            onChange={(e) => setCompanyAddress(e.target.value)}
-                            placeholder="Sakarya Mh. 1113. Sk. 3-A Şehzadeler/Manisa"
-                        />
-                    </div>
-                </div>
+                {/* Top Sections: Company + Logo + Font */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-4">
+                        {/* Company Inputs */}
+                        <div className="grid grid-cols-1 gap-2 p-4 bg-muted/30 rounded-lg border">
+                            <Label className="font-semibold mb-2">Firma Bilgileri</Label>
+                            <Input value={companyName} onChange={e => setCompanyName(e.target.value)} placeholder="Firma Adı" />
+                            <Input value={companyOwner} onChange={e => setCompanyOwner(e.target.value)} placeholder="Firma Sahibi" />
+                            <Input value={companyAddress} onChange={e => setCompanyAddress(e.target.value)} placeholder="Adres" />
+                        </div>
 
-                {/* Logo Section */}
-                <div className="p-4 bg-muted/30 rounded-lg border">
-                    <Label className="flex items-center gap-2 mb-3">
-                        <ImageIcon className="w-4 h-4" />
-                        Logo
-                    </Label>
-                    <div className="flex items-center gap-4">
-                        {logoPreview ? (
-                            <div className="relative group">
-                                <img
-                                    src={logoPreview}
-                                    alt="Logo"
-                                    className="h-20 w-auto max-w-[200px] object-contain border rounded"
-                                />
-                                <button
-                                    onClick={handleRemoveLogo}
-                                    className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
-                                >
-                                    <Trash2 className="w-3 h-3" />
-                                </button>
+                        {/* Font Inputs */}
+                        <div className="p-4 bg-muted/30 rounded-lg border space-y-3">
+                            <Label className="font-semibold flex items-center gap-2"><Type className="w-4 h-4" /> Yazı Tipi</Label>
+                            <div className="grid grid-cols-2 gap-2">
+                                <div>
+                                    <Label className="text-xs">Font</Label>
+                                    <select value={fontFamily} onChange={(e) => setFontFamily(e.target.value)} className="w-full text-sm border rounded h-9 px-2 bg-transparent">
+                                        {CONTRACT_FONTS.map(f => <option key={f.value} value={f.value}>{f.label}</option>)}
+                                    </select>
+                                </div>
+                                <div><Label className="text-xs">Başlık</Label><Input type="number" value={fontSizeTitle || ''} onChange={e => setFontSizeTitle(e.target.value === '' ? 0 : parseInt(e.target.value))} className="h-9" /></div>
+                                <div><Label className="text-xs">Alt Başlık</Label><Input type="number" value={fontSizeHeading || ''} onChange={e => setFontSizeHeading(e.target.value === '' ? 0 : parseInt(e.target.value))} className="h-9" /></div>
+                                <div><Label className="text-xs">Gövde</Label><Input type="number" value={fontSizeBody || ''} onChange={e => setFontSizeBody(e.target.value === '' ? 0 : parseInt(e.target.value))} className="h-9" /></div>
                             </div>
-                        ) : (
-                            <div className="h-20 w-32 border-2 border-dashed rounded flex items-center justify-center text-muted-foreground text-xs">
-                                Logo Yok
-                            </div>
-                        )}
-                        <label className="cursor-pointer">
-                            <input
-                                type="file"
-                                accept="image/*"
-                                onChange={handleLogoSelect}
-                                className="hidden"
-                            />
-                            <div className="flex items-center gap-2 px-4 py-2 bg-primary/10 text-primary rounded-lg hover:bg-primary/20 transition-colors">
-                                <Upload className="w-4 h-4" />
-                                Logo Yükle
-                            </div>
-                        </label>
-                    </div>
-                </div>
-
-                {/* Font Settings */}
-                <div className="p-4 bg-muted/30 rounded-lg border">
-                    <Label className="flex items-center gap-2 mb-3">
-                        <Type className="w-4 h-4" />
-                        Yazı Tipi Ayarları
-                    </Label>
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                        <div>
-                            <Label htmlFor="fontFamily" className="text-xs">Font Ailesi</Label>
-                            <select
-                                id="fontFamily"
-                                value={fontFamily}
-                                onChange={(e) => setFontFamily(e.target.value)}
-                                className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                            >
-                                {CONTRACT_FONTS.map((font) => (
-                                    <option key={font.value} value={font.value}>
-                                        {font.label}
-                                    </option>
-                                ))}
-                            </select>
-                        </div>
-                        <div>
-                            <Label htmlFor="fontSizeTitle" className="text-xs">Başlık (px)</Label>
-                            <Input
-                                id="fontSizeTitle"
-                                type="number"
-                                value={fontSizeTitle}
-                                onChange={(e) => setFontSizeTitle(parseInt(e.target.value) || 16)}
-                                min={10}
-                                max={32}
-                            />
-                        </div>
-                        <div>
-                            <Label htmlFor="fontSizeHeading" className="text-xs">Alt Başlık (px)</Label>
-                            <Input
-                                id="fontSizeHeading"
-                                type="number"
-                                value={fontSizeHeading}
-                                onChange={(e) => setFontSizeHeading(parseInt(e.target.value) || 14)}
-                                min={10}
-                                max={24}
-                            />
-                        </div>
-                        <div>
-                            <Label htmlFor="fontSizeBody" className="text-xs">Gövde (px)</Label>
-                            <Input
-                                id="fontSizeBody"
-                                type="number"
-                                value={fontSizeBody}
-                                onChange={(e) => setFontSizeBody(parseInt(e.target.value) || 12)}
-                                min={8}
-                                max={18}
-                            />
                         </div>
                     </div>
-                </div>
 
-                {/* Placeholders Reference */}
-                <div className="p-4 bg-blue-50 rounded-lg border border-blue-100">
-                    <Label className="flex items-center gap-2 mb-3 text-blue-700">
-                        <Info className="w-4 h-4" />
-                        Kullanılabilir Alanlar (Tıklayarak Kopyala)
-                    </Label>
-                    <div className="flex flex-wrap gap-2">
-                        {CONTRACT_PLACEHOLDERS.map((p) => (
-                            <button
-                                key={p.key}
-                                onClick={() => copyPlaceholder(p.key)}
-                                className={cn(
-                                    "flex items-center gap-1 px-2 py-1 text-xs rounded border transition-all",
-                                    copiedPlaceholder === p.key
-                                        ? "bg-green-100 border-green-300 text-green-700"
-                                        : "bg-white border-blue-200 text-blue-700 hover:bg-blue-100"
-                                )}
-                                title={p.description}
-                            >
-                                {copiedPlaceholder === p.key ? (
-                                    <Check className="w-3 h-3" />
+                    <div className="space-y-4">
+                        {/* Logo */}
+                        <div className="p-4 bg-muted/30 rounded-lg border">
+                            <Label className="font-semibold mb-2 flex items-center gap-2"><ImageIcon className="w-4 h-4" /> Logo</Label>
+                            <div className="flex items-center gap-4">
+                                {logoPreview ? (
+                                    <div className="relative group">
+                                        <img src={logoPreview} alt="Logo" className="h-16 object-contain border rounded bg-white" />
+                                        <button onClick={handleRemoveLogo} className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"><Trash2 className="w-3 h-3" /></button>
+                                    </div>
                                 ) : (
-                                    <Copy className="w-3 h-3" />
+                                    <div className="h-16 w-24 border-2 border-dashed rounded flex items-center justify-center text-xs text-muted-foreground">Yok</div>
                                 )}
-                                {p.key}
-                            </button>
-                        ))}
+                                <label className="cursor-pointer">
+                                    <input type="file" accept="image/*" onChange={handleLogoSelect} className="hidden" />
+                                    <div className="text-sm px-3 py-1 bg-primary/10 text-primary rounded hover:bg-primary/20 transition-colors">Değiştir</div>
+                                </label>
+                            </div>
+                        </div>
+
+                        {/* Highlight Settings */}
+                        <div className="p-4 bg-muted/30 rounded-lg border">
+                            <Label className="font-semibold mb-3 flex items-center gap-2">
+                                <div className="w-4 h-4 rounded-full border shadow-sm" style={{ backgroundColor: highlightColor }}></div>
+                                Otomatik Vurgu
+                            </Label>
+                            <div className="flex items-center gap-3 mb-3">
+                                <Label className="text-xs whitespace-nowrap">Vurgu Rengi:</Label>
+                                <div className="flex gap-2 items-center">
+                                    <Input
+                                        type="color"
+                                        value={highlightColor}
+                                        onChange={(e) => setHighlightColor(e.target.value)}
+                                        className="w-10 h-8 p-1 cursor-pointer"
+                                    />
+                                    <span className="text-xs text-muted-foreground">{highlightColor}</span>
+                                </div>
+                            </div>
+                            <div className="space-y-1 max-h-[120px] overflow-y-auto border rounded p-2 bg-background">
+                                {CONTRACT_PLACEHOLDERS.map((ph) => (
+                                    <label key={ph.key} className="flex items-center gap-2 text-xs cursor-pointer hover:bg-muted/50 p-1 rounded">
+                                        <input
+                                            type="checkbox"
+                                            checked={highlightedFields.includes(ph.key)}
+                                            onChange={() => toggleHighlightedField(ph.key)}
+                                            className="rounded border-gray-300 text-primary focus:ring-primary h-3 w-3"
+                                        />
+                                        <span className="font-mono">{ph.key}</span>
+                                    </label>
+                                ))}
+                            </div>
+                        </div>
                     </div>
                 </div>
 
-                {/* Template Editor */}
-                <div>
-                    <Label className="flex items-center gap-2 mb-2">
-                        <FileText className="w-4 h-4" />
-                        Sözleşme Şablonu
-                    </Label>
-                    <textarea
-                        value={templateContent}
-                        onChange={(e) => setTemplateContent(e.target.value)}
-                        className="flex min-h-[400px] w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 font-mono"
-                        placeholder="Sözleşme şablonunu buraya yazın..."
-                        style={{ fontFamily: 'monospace' }}
-                    />
-                    <p className="text-xs text-muted-foreground mt-1">
-                        Yukarıdaki alanları (örn: {"{{MUSTERI_ADI}}"}) kullanarak dinamik içerik ekleyebilirsiniz.
-                    </p>
-                </div>
+                <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+                    <TabsList className="grid w-full grid-cols-2 mb-4">
+                        <TabsTrigger value="editor" className="flex items-center gap-2">
+                            <Edit className="w-4 h-4" /> Editör
+                        </TabsTrigger>
+                        <TabsTrigger value="preview" className="flex items-center gap-2">
+                            <Eye className="w-4 h-4" /> Önizleme
+                        </TabsTrigger>
+                    </TabsList>
 
-                {/* Actions */}
-                <div className="flex justify-end gap-3 pt-4 border-t">
-                    <Button variant="outline" onClick={onClose}>
-                        İptal
-                    </Button>
-                    <Button
-                        onClick={() => updateMutation.mutate()}
-                        disabled={updateMutation.isPending}
-                    >
-                        {updateMutation.isPending ? (
-                            <>
-                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                Kaydediliyor...
-                            </>
-                        ) : (
-                            <>
-                                <Save className="mr-2 h-4 w-4" />
-                                Kaydet
-                            </>
-                        )}
-                    </Button>
-                </div>
+                    <TabsContent value="editor" className="min-h-[400px]">
+                        <div className="flex gap-4 h-full">
+                            <div className="flex-1">
+                                <textarea
+                                    value={templateContent}
+                                    onChange={(e) => setTemplateContent(e.target.value)}
+                                    className="w-full h-[400px] p-4 text-sm font-mono border rounded-md resize-none focus:outline-none focus:ring-2 focus:ring-primary/50"
+                                    placeholder="Sözleşme metni..."
+                                />
+                            </div>
+                            <div className="w-64 space-y-2 max-h-[400px] overflow-y-auto border-l pl-4">
+                                <p className="text-xs font-semibold text-muted-foreground mb-2">Dinamik Alanlar</p>
+                                {CONTRACT_PLACEHOLDERS.map((ph) => (
+                                    <div
+                                        key={ph.key}
+                                        className="p-2 border rounded bg-muted/20 hover:bg-muted/50 cursor-pointer transition-colors group"
+                                        onClick={() => copyToClipboard(ph.key)}
+                                    >
+                                        <div className="flex justify-between items-center">
+                                            <code className="text-xs font-bold text-primary">{ph.key}</code>
+                                            {copiedPlaceholder === ph.key ? <Check className="w-3 h-3 text-green-500" /> : <Copy className="w-3 h-3 opacity-0 group-hover:opacity-50" />}
+                                        </div>
+                                        <p className="text-[10px] text-muted-foreground mt-1">{ph.description}</p>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    </TabsContent>
+
+                    <TabsContent value="preview">
+                        <div className="border rounded-lg shadow-sm bg-white p-8 min-h-[600px] max-h-[600px] overflow-y-auto">
+                            {logoPreview && (
+                                <div className="mb-6 flex justify-center">
+                                    <img src={logoPreview} alt="Logo" className="max-h-24 max-w-[200px] object-contain" />
+                                </div>
+                            )}
+                            <div
+                                className="preview-content"
+                                style={{
+                                    fontFamily: fontFamily || 'Times New Roman',
+                                    color: '#000000'
+                                }}
+                            >
+                                {(() => {
+                                    let isHighlighted = false;
+                                    return getPreviewText().split('\n').map((line, i) => {
+                                        const trimmedLine = line.trim();
+                                        const isHeader = trimmedLine.length > 0 && trimmedLine === trimmedLine.toUpperCase() && trimmedLine.length > 5 && trimmedLine.length < 100;
+                                        const isMainHeader = i === 0 || trimmedLine.includes('SÖZLEŞME');
+
+                                        // Render line with highlight support
+                                        const renderLineContent = (text: string) => {
+                                            const parts = text.split(/(%%%HL%%%|%%%HL_END%%%)/g);
+                                            return parts.map((part, idx) => {
+                                                if (part === '%%%HL%%%') { isHighlighted = true; return null; }
+                                                if (part === '%%%HL_END%%%') { isHighlighted = false; return null; }
+
+                                                if (isHighlighted) {
+                                                    return <span key={idx} style={{ color: highlightColor, fontWeight: 'bold' }}>{part}</span>;
+                                                }
+                                                return <span key={idx}>{part}</span>;
+                                            });
+                                        };
+
+                                        return (
+                                            <div
+                                                key={i}
+                                                style={{
+                                                    minHeight: '1.2em',
+                                                    fontSize: isMainHeader ? `${fontSizeTitle || 16}px` : (isHeader ? `${fontSizeHeading || 14}px` : `${fontSizeBody || 12}px`),
+                                                    fontWeight: (isHeader || isMainHeader) ? 'bold' : 'normal',
+                                                    textAlign: isMainHeader ? 'center' : 'left',
+                                                    marginTop: (isHeader || isMainHeader) ? '1.5em' : '0',
+                                                    marginBottom: (isHeader || isMainHeader) ? '4px' : '2px',
+                                                    lineHeight: 1.5,
+                                                    display: 'block', // Ensure div behaves as block
+                                                    whiteSpace: 'pre-wrap' // Preserve spaces
+                                                }}
+                                            >
+                                                {renderLineContent(line)}
+                                            </div>
+                                        );
+                                    });
+                                })()}
+                            </div>
+                        </div>
+                        <div className="mt-4 flex justify-end">
+                            <Button onClick={() => updateMutation.mutate()} disabled={updateMutation.isPending}>
+                                {updateMutation.isPending ? (
+                                    <>
+                                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                        Kaydediliyor...
+                                    </>
+                                ) : (
+                                    <>
+                                        <Save className="mr-2 h-4 w-4" />
+                                        Değişiklikleri Kaydet
+                                    </>
+                                )}
+                            </Button>
+                        </div>
+                    </TabsContent>
+                </Tabs>
             </div>
         </Dialog>
     );

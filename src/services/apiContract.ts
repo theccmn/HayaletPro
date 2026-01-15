@@ -2,38 +2,63 @@ import { supabase } from '../lib/supabase';
 
 export interface ContractSettings {
     id: string;
-    template_content: string;
+    company_name: string;
+    company_address: string;
+    company_owner: string;
     logo_url: string | null;
+    template_content: string;
+    created_at: string;
+    updated_at: string;
     font_family: string;
     font_size_body: number;
     font_size_title: number;
     font_size_heading: number;
-    company_name: string;
-    company_address: string;
-    company_owner: string;
-    created_at: string;
-    updated_at: string;
+    highlight_color?: string;
+    highlighted_fields?: string[];
 }
 
 export const getContractSettings = async (): Promise<ContractSettings | null> => {
+    // 1. Fetch ALL rows ordered by updated_at desc
     const { data, error } = await supabase
         .from('contract_settings')
         .select('*')
-        .limit(1)
-        .single();
+        .order('updated_at', { ascending: false });
 
     if (error) {
         console.error('Error fetching contract settings:', error);
         return null;
     }
 
-    return data as ContractSettings;
+    if (!data || data.length === 0) return null;
+
+    // 2. Self-healing: If more than 1 row exists, delete the extras
+    if (data.length > 1) {
+        console.warn(`Found ${data.length} contract_settings rows. Cleaning up duplicates...`);
+        const [latest, ...duplicates] = data;
+
+        // Asynchronously delete duplicates
+        const duplicateIds = duplicates.map(d => d.id);
+        supabase
+            .from('contract_settings')
+            .delete()
+            .in('id', duplicateIds)
+            .then(({ error: delError }) => {
+                if (delError) console.error('Failed to cleanup duplicates:', delError);
+                else console.log('Cleanup successful. Deleted:', duplicateIds);
+            });
+
+        return latest as ContractSettings;
+    }
+
+    // Return the single valid row
+    return data[0] as ContractSettings;
 };
 
 export const updateContractSettings = async (
     id: string,
     settings: Partial<Omit<ContractSettings, 'id' | 'created_at' | 'updated_at'>>
 ): Promise<ContractSettings | null> => {
+    console.log('Updating contract settings for ID:', id, 'Payload:', settings);
     const { data, error } = await supabase
         .from('contract_settings')
         .update({
@@ -43,6 +68,8 @@ export const updateContractSettings = async (
         .eq('id', id)
         .select()
         .single();
+
+    console.log('Update response:', { data, error });
 
     if (error) {
         console.error('Error updating contract settings:', error);
