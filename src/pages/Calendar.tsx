@@ -50,7 +50,7 @@ export default function Calendar() {
     // Fetch Data
     const { data: projects } = useQuery({ queryKey: ['projects'], queryFn: getProjects });
     const { data: statuses } = useQuery({ queryKey: ['statuses'], queryFn: getStatuses });
-    const { data: transactions } = useQuery({ queryKey: ['transactions'], queryFn: getTransactions });
+    const { data: transactions } = useQuery({ queryKey: ['transactions'], queryFn: () => getTransactions() });
 
     // Process Events
     const events = useMemo(() => {
@@ -58,6 +58,11 @@ export default function Calendar() {
 
         // 1. Projects
         projects?.forEach(p => {
+            // Debug Log for Date Issue
+            if (p.title.includes('Test') || p.title.includes('CCC')) {
+                console.log(`Project: ${p.title}, Raw StartDate: ${p.start_date}`);
+            }
+
             if (p.start_date) {
                 let dateStr = p.start_date;
                 // Handle complex date format "start|end" or just simple dates
@@ -66,7 +71,16 @@ export default function Calendar() {
                         dateStr = dateStr.split('|')[0];
                     }
 
-                    const dateObj = new Date(dateStr);
+                    let dateObj: Date;
+                    // Custom parsing for YYYY-MM-DD to ensure Local Midnight (00:00)
+                    // new Date("2026-01-17") defaults to UTC -> 03:00 Local (GMT+3)
+                    if (dateStr.length === 10 && dateStr.includes('-')) {
+                        const [year, month, day] = dateStr.split('-').map(Number);
+                        dateObj = new Date(year, month - 1, day);
+                    } else {
+                        dateObj = new Date(dateStr);
+                    }
+
                     if (!isNaN(dateObj.getTime())) {
                         // const status = statuses?.find(s => s.id === p.status_id);
                         // Force blue color for projects in calendar view for better visibility

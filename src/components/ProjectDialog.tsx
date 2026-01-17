@@ -19,6 +19,8 @@ import { useState, useEffect } from 'react';
 import { DateTimePicker } from './DateTimePicker';
 import { format } from 'date-fns';
 import { tr } from 'date-fns/locale';
+import { insertEvent, checkConnection } from '../services/apiGoogleCalendar';
+import { toast } from 'sonner';
 
 // Combined Schema for final submission check
 const fullSchema = z.object({
@@ -72,6 +74,14 @@ export function ProjectDialog({ isOpen, onClose, projectToEdit }: ProjectDialogP
     // UI State
     const [isReadyToSubmit, setIsReadyToSubmit] = useState(false);
 
+    // Google Calendar State
+    const [addToCalendar, setAddToCalendar] = useState(true);
+    const [isCalendarConnected, setIsCalendarConnected] = useState(false);
+
+    useEffect(() => {
+        checkConnection().then(setIsCalendarConnected);
+    }, [isOpen]);
+
     // Queries
     const { data: statuses } = useQuery({ queryKey: ['statuses'], queryFn: getStatuses });
     const { data: clients } = useQuery({ queryKey: ['clients'], queryFn: getClients });
@@ -113,6 +123,7 @@ export function ProjectDialog({ isOpen, onClose, projectToEdit }: ProjectDialogP
                 setIsReadyToSubmit(false);
                 setCustomFeatures([]);
                 setNewFeatureInput('');
+                setAddToCalendar(true); // Default to true for convenience
                 reset();
             }, 300);
         }
@@ -225,7 +236,7 @@ export function ProjectDialog({ isOpen, onClose, projectToEdit }: ProjectDialogP
                 status_id: data.status_id,
                 client_id: finalClientId,
                 client_name: (data.is_new_client ? data.client_name : selectedClient?.name) || "",
-                start_date: startDate ? new Date(startDate).toISOString() : undefined,
+                start_date: startDate ? (startDate.includes('T') ? new Date(startDate).toISOString() : new Date(`${startDate}T09:00:00`).toISOString()) : undefined,
                 end_date: endDate ? new Date(endDate).toISOString() : undefined,
                 notes: data.notes || undefined,
                 price: data.custom_price || 0,
@@ -242,7 +253,7 @@ export function ProjectDialog({ isOpen, onClose, projectToEdit }: ProjectDialogP
                 return createProject(projectPayload);
             }
         },
-        onSuccess: async (createdProject) => {
+        onSuccess: async (createdProject, variables) => {
             // Create installments if any
             if (installments.length > 0 && createdProject) {
                 const installmentsWithProjectId = installments.map(i => ({
@@ -250,6 +261,83 @@ export function ProjectDialog({ isOpen, onClose, projectToEdit }: ProjectDialogP
                     project_id: createdProject.id
                 }));
                 await createInstallments(installmentsWithProjectId);
+            }
+
+            // Google Calendar Sync
+            console.log('Google Sync Check:', { addToCalendar, isCalendarConnected, startDate: variables.start_date });
+
+            if (addToCalendar && isCalendarConnected && variables.start_date) {
+                try {
+                    let eventPayload: any = {
+                        summary: `[Proje] ${variables.title}`,
+                        description: `Müşteri: ${variables.is_new_client ? variables.client_name : selectedClient?.name}\nNotlar: ${variables.notes || ''}`
+                    };
+
+                    const parts = variables.start_date.split('|');
+                    const rawStart = parts[0]?.trim();
+                    const rawEnd = parts[1]?.trim();
+
+                    // Check if time is provided (e.g., contains 'T' and not strictly 00:00 or default)
+                    // Our DateTimePicker provides T13:00:00 format.
+                    const hasTime = rawStart?.includes('T');
+
+                    if (hasTime) {
+                        // TIMED EVENT
+                        // Note: We use the raw strings directly if they are ISO/Local aware,
+                        // but Google needs valid ISO with Timezone or UTC.
+                        // Variables.start_date usually comes like "2026-01-17T13:00:00" (Local string if we built it that way)
+
+                        eventPayload.start = {
+                            dateTime: new Date(rawStart).toISOString(), // Convert Local string to UTC ISO
+                            timeZone: 'Europe/Istanbul' // Optional: force timezone context
+                        };
+
+                        if (rawEnd) {
+                            eventPayload.end = {
+                                dateTime: new Date(rawEnd).toISOString()
+                            };
+                        } else {
+                            // Default 1 hour duration
+                            const d = new Date(rawStart);
+                            d.setHours(d.getHours() + 1);
+                            eventPayload.end = {
+                                dateTime: d.toISOString()
+                            };
+                        }
+                    } else {
+                        // ALL DAY EVENT (Fallback logic)
+                        let eventStartStr = variables.start_date.split('T')[0];
+                        let eventEndStr = "";
+
+                        // ... existing range logic ...
+                        if (variables.start_date.includes('|')) {
+                            const p = variables.start_date.split('|');
+                            eventStartStr = p[0].split('T')[0];
+                            if (p[1]) {
+                                const endDateRaw = p[1].split('T')[0];
+                                const d = new Date(endDateRaw);
+                                d.setDate(d.getDate() + 1);
+                                eventEndStr = d.toISOString().split('T')[0];
+                            }
+                        }
+
+                        if (!eventEndStr) {
+                            const d = new Date(eventStartStr);
+                            d.setDate(d.getDate() + 1);
+                            eventEndStr = d.toISOString().split('T')[0];
+                        }
+
+                        eventPayload.start = { date: eventStartStr };
+                        eventPayload.end = { date: eventEndStr };
+                    }
+
+                    const result = await insertEvent(eventPayload);
+                    // console.log('Project Event Inserted:', result);
+                    toast.success("Google Takvim'e eklendi.");
+                } catch (error) {
+                    console.error("Calendar Sync Error:", error);
+                    toast.error("Google Takvim senkronizasyonu başarısız oldu.");
+                }
             }
 
             queryClient.invalidateQueries({ queryKey: ['projects'] });
@@ -949,6 +1037,7 @@ Tarih: {{TARIH}}`;
 
     const renderStep7_Summary = () => {
         const formData = watch();
+
         return (
             <div className="space-y-6 animate-in slide-in-from-right-4 fade-in duration-300">
                 <div className="rounded-lg border p-4 space-y-4 bg-muted/10">
@@ -1002,17 +1091,19 @@ Tarih: {{TARIH}}`;
                             )}
                         </div>
                     </div>
-                    {installments.length > 0 && (
-                        <div className="pt-2 border-t mt-2">
-                            <span className="text-xs font-semibold text-muted-foreground block mb-2">Ödeme Planı</span>
-                            <div className="space-y-1">
-                                {installments.map((inst, idx) => (
-                                    <div key={idx} className="flex justify-between text-xs">
-                                        <span>{idx + 1}. {inst.notes} ({format(new Date(inst.due_date), 'dd.MM.yyyy')})</span>
-                                        <span className="font-medium">{formatMoney(inst.amount)}</span>
-                                    </div>
-                                ))}
-                            </div>
+
+                    {isCalendarConnected && (
+                        <div className="flex items-center space-x-2 pt-2 border-t">
+                            <input
+                                type="checkbox"
+                                id="addToCalendarProject"
+                                checked={addToCalendar}
+                                onChange={(e) => setAddToCalendar(e.target.checked)}
+                                className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                            />
+                            <Label htmlFor="addToCalendarProject" className="cursor-pointer text-sm text-blue-700 font-medium flex items-center gap-1">
+                                <Calendar className="w-4 h-4" /> Projeyi Google Takvimim'e ekle
+                            </Label>
                         </div>
                     )}
                 </div>

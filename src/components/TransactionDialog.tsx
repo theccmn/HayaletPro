@@ -12,6 +12,8 @@ import { cn } from '../lib/utils';
 import { ArrowDownCircle, ArrowUpCircle, Search, Settings } from 'lucide-react';
 import { getFinanceSettings } from '../services/apiFinance';
 import { FinanceSettingsDialog } from './FinanceSettingsDialog';
+import { insertEvent, checkConnection } from '../services/apiGoogleCalendar';
+import { toast } from 'sonner';
 
 interface TransactionDialogProps {
     isOpen: boolean;
@@ -40,7 +42,16 @@ export function TransactionDialog({ isOpen, onClose, defaultProjectId }: Transac
     const [projectSearch, setProjectSearch] = useState('');
     const [statusFilter, setStatusFilter] = useState<string>('all');
 
+    // Google Calendar State
+    const [addToCalendar, setAddToCalendar] = useState(false);
+    const [isCalendarConnected, setIsCalendarConnected] = useState(false);
+
+    useEffect(() => {
+        checkConnection().then(setIsCalendarConnected);
+    }, [isOpen]);
+
     const queryClient = useQueryClient();
+    // ... (skipping unchanged lines is not possible with replace_file_content unless I target specific chunks. I will use multi_replace for this.)
 
     const { data: projects } = useQuery({
         queryKey: ['projects'],
@@ -83,7 +94,40 @@ export function TransactionDialog({ isOpen, onClose, defaultProjectId }: Transac
     }, [isOpen, defaultProjectId]);
 
     const createMutation = useMutation({
-        mutationFn: createTransaction,
+        mutationFn: async (data: NewTransaction) => {
+            const result = await createTransaction(data);
+
+            // Handle Google Calendar sync
+            if (addToCalendar && isCalendarConnected && data.job_date && data.type === 'income') {
+                try {
+                    // Convert to YYYY-MM-DD for All Day Event
+                    const yyyyMMdd = data.job_date.split('T')[0];
+
+                    // Calculate next day for end date (exclusive)
+                    const startDateObj = new Date(yyyyMMdd);
+                    const endDateObj = new Date(startDateObj);
+                    endDateObj.setDate(endDateObj.getDate() + 1);
+                    const nextDayStr = endDateObj.toISOString().split('T')[0];
+
+                    const result = await insertEvent({
+                        summary: `[Teslimat] ${data.title}`,
+                        description: `Tutar: ${data.amount}₺\nKategori: ${data.category}`,
+                        start: {
+                            date: yyyyMMdd
+                        },
+                        end: {
+                            date: nextDayStr
+                        }
+                    });
+                    console.log('Transaction Event Inserted:', result);
+                    toast.success("Google Takvim'e eklendi.");
+                } catch (error) {
+                    console.error("Calendar Sync Error:", error);
+                    toast.error("Google Takvim senkronizasyonu başarısız oldu.");
+                }
+            }
+            return result;
+        },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['transactions'] });
             onClose();
@@ -97,6 +141,7 @@ export function TransactionDialog({ isOpen, onClose, defaultProjectId }: Transac
             setProjectSearch('');
             setStatusFilter('all');
             setHasJobDate(false);
+            setAddToCalendar(false);
             setJobDate(new Date().toISOString().split('T')[0]);
             // setJobTime removed - handled with default
         },
@@ -147,7 +192,7 @@ export function TransactionDialog({ isOpen, onClose, defaultProjectId }: Transac
             title={type === 'income' ? "Yeni Gelir Ekle" : "Yeni Gider Ekle"}
             description="Finansal hareket kaydı oluşturun."
         >
-            <form onSubmit={handleSubmit} className="space-y-4 mt-4">
+            <form onSubmit={handleSubmit} className="space-y-4 mt-4 max-h-[calc(85vh-120px)] overflow-y-auto px-1">
                 {/* Type Selection */}
                 <div className="grid grid-cols-2 gap-4 mb-4">
                     <button
@@ -280,6 +325,22 @@ export function TransactionDialog({ isOpen, onClose, defaultProjectId }: Transac
                                 </div>
                             </div>
                         )}
+
+                        {hasJobDate && isCalendarConnected && (
+                            <div className="flex items-center space-x-2 pl-6 animate-in fade-in slide-in-from-top-1">
+                                <input
+                                    type="checkbox"
+                                    id="addToCalendar"
+                                    checked={addToCalendar}
+                                    onChange={(e) => setAddToCalendar(e.target.checked)}
+                                    className="h-3.5 w-3.5 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                                />
+                                <Label htmlFor="addToCalendar" className="cursor-pointer text-xs text-blue-700 font-medium flex items-center gap-1">
+                                    Google Takvim'e de ekle
+                                </Label>
+                            </div>
+                        )}
+
                         <p className="text-[10px] text-muted-foreground ml-6">
                             İşaretlerseniz, işlem tarihinden bağımsız olarak bu tarih "iş günü" olarak takvimde görünür.
                         </p>

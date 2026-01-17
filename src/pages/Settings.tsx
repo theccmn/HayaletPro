@@ -5,6 +5,7 @@ import { getPackages, deletePackage } from '../services/apiPackages';
 import { getSetting, updateSetting } from '../services/apiSettings';
 import { PackageDialog } from '../components/PackageDialog';
 import { ContractSettingsDialog } from '../components/ContractSettingsDialog';
+import { GoogleCalendarSettings } from '../components/GoogleCalendarSettings';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
@@ -106,6 +107,10 @@ export default function Settings() {
             </div>
 
             <div className="grid gap-6 max-w-2xl">
+                {/* Google Calendar Settings */}
+                <GoogleCalendarSettings />
+
+                {/* Google Drive Settings */}
                 <div className="p-6 border rounded-xl bg-card space-y-4">
                     <div className="flex items-center gap-3 mb-2">
                         <div className="p-2 bg-blue-50 text-blue-600 rounded-lg">

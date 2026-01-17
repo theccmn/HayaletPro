@@ -12,7 +12,7 @@ export const getTransactions = async (projectId?: string): Promise<Transaction[]
         `)
         .order('date', { ascending: false });
 
-    if (projectId) {
+    if (projectId && typeof projectId === 'string') {
         query = query.eq('project_id', projectId);
     }
 

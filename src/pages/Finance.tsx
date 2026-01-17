@@ -18,7 +18,7 @@ export default function Finance() {
 
     const { data: transactions, isLoading } = useQuery({
         queryKey: ['transactions'],
-        queryFn: getTransactions,
+        queryFn: () => getTransactions(),
     });
 
     const filteredTransactions = transactions?.filter(t => {
