@@ -130,6 +130,9 @@ export function TransactionDialog({ isOpen, onClose, defaultProjectId }: Transac
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['transactions'] });
+            // ClientDetail sayfasının güncellenmesi için
+            queryClient.invalidateQueries({ queryKey: ['clientTransactions'] });
+            queryClient.invalidateQueries({ queryKey: ['clientStats'] });
             onClose();
             // Reset form
             setTitle('');
