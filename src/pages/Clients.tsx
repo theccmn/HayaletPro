@@ -4,6 +4,7 @@ import { Plus, Search, Loader2, MoreVertical, Pencil, Trash2, Phone, Mail, MapPi
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { ClientDialog } from '../components/ClientDialog';
 import type { Client } from '../types';
 import {
@@ -24,6 +25,7 @@ import {
 } from "../components/ui/alert-dialog";
 
 export default function Clients() {
+    const navigate = useNavigate();
     const [searchTerm, setSearchTerm] = useState('');
     const [isDialogOpen, setIsDialogOpen] = useState(false);
     const [clientToEdit, setClientToEdit] = useState<Client | null>(null);
@@ -130,7 +132,11 @@ export default function Clients() {
             ) : (
                 <div className="grid gap-4 grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
                     {filteredClients?.map((client) => (
-                        <div key={client.id} className="group relative rounded-xl border bg-card text-card-foreground shadow-sm transition-all hover:shadow-md p-6">
+                        <div
+                            key={client.id}
+                            className="group relative rounded-xl border bg-card text-card-foreground shadow-sm transition-all hover:shadow-md p-6 cursor-pointer"
+                            onClick={() => navigate(`/clients/${client.id}`)}
+                        >
                             <div className="flex items-start justify-between">
                                 <div className="flex items-center gap-3">
                                     <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center text-primary font-semibold text-lg">
@@ -147,7 +153,12 @@ export default function Clients() {
                                 </div>
                                 <DropdownMenu>
                                     <DropdownMenuTrigger asChild>
-                                        <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground -mr-2 -mt-2">
+                                        <Button
+                                            variant="ghost"
+                                            size="icon"
+                                            className="h-8 w-8 text-muted-foreground -mr-2 -mt-2"
+                                            onClick={(e) => e.stopPropagation()}
+                                        >
                                             <MoreVertical className="h-4 w-4" />
                                         </Button>
                                     </DropdownMenuTrigger>

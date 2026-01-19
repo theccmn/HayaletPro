@@ -4,6 +4,7 @@ import Calendar from './pages/Calendar';
 import Finance from './pages/Finance';
 import Dashboard from './pages/Dashboard';
 import Clients from './pages/Clients';
+import ClientDetail from './pages/ClientDetail';
 import Inventory from './pages/Inventory';
 import Settings from './pages/Settings';
 import { ClientSelectionView } from './pages/ClientSelectionView';
@@ -29,6 +30,7 @@ function App() {
             <Route path="calendar" element={<Calendar />} />
             <Route path="finance" element={<Finance />} />
             <Route path="clients" element={<Clients />} />
+            <Route path="clients/:id" element={<ClientDetail />} />
             <Route path="inventory" element={<Inventory />} />
             <Route path="settings" element={<Settings />} />
             <Route path="*" element={<div className="p-4">Sayfa bulunamadı</div>} />

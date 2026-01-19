@@ -437,90 +437,173 @@ export default function Projects() {
                                 : "grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
                         : "grid-cols-1"
                 )}>
-                    {sortedProjects.map((project) => (
-                        <div
-                            key={project.id}
-                            className={cn(
-                                "group relative rounded-xl border bg-card text-card-foreground shadow-sm transition-all hover:shadow-md",
-                                (() => {
-                                    if (transactions && (project.price || 0) > 0) {
-                                        const income = transactions
-                                            .filter(t => t.type === 'income' && t.project_id === project.id)
-                                            .reduce((sum, t) => sum + (t.amount || 0), 0);
-                                        if (income >= (project.price || 0)) return "border-green-200 bg-green-50/50";
-                                    }
-                                    return "";
-                                })(),
-                                viewMode === 'list' ? "flex items-center p-4 gap-4" : "p-6"
-                            )}
-                        >
-                            {viewMode === 'grid' ? (
-                                <>
-                                    <div className="flex items-start justify-between">
-                                        <div className="flex items-center gap-2">
-                                            <div className={cn("px-2.5 py-0.5 rounded-full text-xs font-semibold", getStatusColor(project.status_id))}>
-                                                {getStatusLabel(project.status_id)}
+                    {sortedProjects.map((project) => {
+                        // Ödeme durumu hesaplama
+                        const projectIncome = transactions
+                            ?.filter(t => t.type === 'income' && t.project_id === project.id)
+                            .reduce((sum, t) => sum + (t.amount || 0), 0) || 0;
+                        const isPaymentComplete = (project.price || 0) > 0 && projectIncome >= (project.price || 0);
+
+                        // Gecikmiş ödeme kontrolü
+                        let isOverdue = false;
+                        if (project.project_installments && transactions) {
+                            let remainingPaid = projectIncome;
+                            isOverdue = project.project_installments.some(inst => {
+                                if (remainingPaid >= inst.amount) {
+                                    remainingPaid -= inst.amount;
+                                    return false;
+                                } else {
+                                    remainingPaid = 0;
+                                    return new Date(inst.due_date) < new Date(new Date().setHours(0, 0, 0, 0));
+                                }
+                            });
+                        }
+
+                        return (
+                            <div
+                                key={project.id}
+                                className={cn(
+                                    "group relative rounded-xl border bg-card text-card-foreground shadow-sm transition-all hover:shadow-md",
+                                    isOverdue
+                                        ? "border-red-300 bg-red-50/50 dark:bg-red-950/20 ring-2 ring-red-400"
+                                        : isPaymentComplete
+                                            ? "border-green-200 bg-green-50/50"
+                                            : "",
+                                    viewMode === 'list' ? "flex items-center p-4 gap-4" : "p-6"
+                                )}
+                            >
+                                {viewMode === 'grid' ? (
+                                    <>
+                                        <div className="flex items-start justify-between">
+                                            <div className="flex items-center gap-2">
+                                                <div className={cn("px-2.5 py-0.5 rounded-full text-xs font-semibold", getStatusColor(project.status_id))}>
+                                                    {getStatusLabel(project.status_id)}
+                                                </div>
+                                                {/* @ts-ignore */}
+                                                {(project.photo_selections?.status === 'completed' || (Array.isArray(project.photo_selections) && project.photo_selections[0]?.status === 'completed')) && (
+                                                    <div className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 text-xs font-bold border border-blue-200 animate-in fade-in zoom-in" title="Müşteri seçimini tamamladı">
+                                                        <CheckCircle2 className="w-3 h-3" />
+                                                        <span className="hidden xl:inline">Seçim Tamam</span>
+                                                    </div>
+                                                )}
+                                                {/* @ts-ignore */}
+                                                {(() => {
+                                                    const sel = Array.isArray(project.photo_selections) ? project.photo_selections[0] : project.photo_selections;
+                                                    const isExpired = sel?.settings?.expiration_date && new Date() > new Date(new Date(sel.settings.expiration_date).setHours(23, 59, 59, 999));
+
+                                                    if (isExpired && sel?.status !== 'completed') {
+                                                        return (
+                                                            <div className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-red-100 text-red-700 text-xs font-bold border border-red-200 animate-in fade-in zoom-in" title="Seçim süresi doldu">
+                                                                <Clock className="w-3 h-3" />
+                                                                <span className="hidden xl:inline">Süre Doldu</span>
+                                                            </div>
+                                                        );
+                                                    }
+                                                    return null;
+                                                })()}
+                                                {(() => {
+                                                    if (!project.project_installments || !transactions) return null;
+
+                                                    const projectIncome = transactions
+                                                        .filter(t => t.type === 'income' && t.project_id === project.id)
+                                                        .reduce((sum, t) => sum + (t.amount || 0), 0);
+
+                                                    let remainingPaid = projectIncome;
+                                                    const isOverdue = project.project_installments.some(inst => {
+                                                        if (remainingPaid >= inst.amount) {
+                                                            remainingPaid -= inst.amount;
+                                                            return false;
+                                                        } else {
+                                                            remainingPaid = 0;
+                                                            return new Date(inst.due_date) < new Date(new Date().setHours(0, 0, 0, 0));
+                                                        }
+                                                    });
+
+                                                    if (isOverdue) {
+                                                        return (
+                                                            <div className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-red-100 text-red-700 text-xs font-bold border border-red-200 animate-in fade-in zoom-in animate-pulse" title="Gecikmiş Ödeme Var">
+                                                                <AlertTriangle className="w-3 h-3" />
+                                                                <span className="hidden xl:inline">Ödeme Gecikti</span>
+                                                            </div>
+                                                        );
+                                                    }
+
+                                                    // Payment Completed Check
+                                                    if ((project.price || 0) > 0 && projectIncome >= (project.price || 0)) {
+                                                        return (
+                                                            <div className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-green-100 text-green-700 text-xs font-bold border border-green-200 animate-in fade-in zoom-in" title="Ödeme Tamamlandı">
+                                                                <CheckCircle2 className="w-3 h-3" />
+                                                                <span className="hidden xl:inline">Ödeme Tamam</span>
+                                                            </div>
+                                                        );
+                                                    }
+                                                    return null;
+                                                })()}
                                             </div>
+                                            <ProjectActions
+                                                project={project}
+                                                onEdit={handleEditClick}
+                                                onDelete={handleDeleteClick}
+                                                onAddTransaction={handleTransactionClick}
+                                                onManageSelection={handleSelectionClick}
+                                                onPaymentDetails={handlePaymentDetailsClick}
+                                            />
+                                        </div>
+
+                                        <div className="mt-4 space-y-1">
+                                            <h3 className="font-semibold leading-none tracking-tight">{project.title}</h3>
+                                            <p className="text-sm text-muted-foreground">{project.client_name}</p>
+                                        </div>
+
+                                        <div className="mt-6 flex items-center justify-between text-sm">
+                                            <div className="flex items-center text-muted-foreground">
+                                                <Calendar className="mr-1 h-3.5 w-3.5" />
+                                                {project.start_date ? format(new Date(project.start_date), 'd MMM yyyy', { locale: tr }) : '-'}
+                                            </div>
+                                            <div className="font-medium">
+                                                {project.price ? `₺${project.price.toLocaleString('tr-TR')}` : '₺0'}
+                                            </div>
+                                        </div>
+                                    </>
+                                ) : (
+                                    <>
+                                        <div className={cn("shrink-0 px-2.5 py-0.5 rounded-full text-xs font-semibold w-24 text-center", getStatusColor(project.status_id))}>
+                                            {getStatusLabel(project.status_id)}
+                                        </div>
+                                        {/* List View Badges */}
+                                        <div className="flex items-center gap-2 shrink-0">
                                             {/* @ts-ignore */}
                                             {(project.photo_selections?.status === 'completed' || (Array.isArray(project.photo_selections) && project.photo_selections[0]?.status === 'completed')) && (
-                                                <div className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 text-xs font-bold border border-blue-200 animate-in fade-in zoom-in" title="Müşteri seçimini tamamladı">
+                                                <div className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 text-xs font-bold border border-blue-200" title="Müşteri seçimini tamamladı">
                                                     <CheckCircle2 className="w-3 h-3" />
-                                                    <span className="hidden xl:inline">Seçim Tamam</span>
+                                                    <span className="hidden lg:inline">Seçildi</span>
                                                 </div>
                                             )}
-                                            {/* @ts-ignore */}
                                             {(() => {
-                                                const sel = Array.isArray(project.photo_selections) ? project.photo_selections[0] : project.photo_selections;
-                                                const isExpired = sel?.settings?.expiration_date && new Date() > new Date(new Date(sel.settings.expiration_date).setHours(23, 59, 59, 999));
-
-                                                if (isExpired && sel?.status !== 'completed') {
+                                                const income = transactions
+                                                    ?.filter(t => t.type === 'income' && t.project_id === project.id)
+                                                    .reduce((sum, t) => sum + (t.amount || 0), 0) || 0;
+                                                if ((project.price || 0) > 0 && income >= (project.price || 0)) {
                                                     return (
-                                                        <div className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-red-100 text-red-700 text-xs font-bold border border-red-200 animate-in fade-in zoom-in" title="Seçim süresi doldu">
-                                                            <Clock className="w-3 h-3" />
-                                                            <span className="hidden xl:inline">Süre Doldu</span>
-                                                        </div>
-                                                    );
-                                                }
-                                                return null;
-                                            })()}
-                                            {(() => {
-                                                if (!project.project_installments || !transactions) return null;
-
-                                                const projectIncome = transactions
-                                                    .filter(t => t.type === 'income' && t.project_id === project.id)
-                                                    .reduce((sum, t) => sum + (t.amount || 0), 0);
-
-                                                let remainingPaid = projectIncome;
-                                                const isOverdue = project.project_installments.some(inst => {
-                                                    if (remainingPaid >= inst.amount) {
-                                                        remainingPaid -= inst.amount;
-                                                        return false;
-                                                    } else {
-                                                        remainingPaid = 0;
-                                                        return new Date(inst.due_date) < new Date(new Date().setHours(0, 0, 0, 0));
-                                                    }
-                                                });
-
-                                                if (isOverdue) {
-                                                    return (
-                                                        <div className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-red-100 text-red-700 text-xs font-bold border border-red-200 animate-in fade-in zoom-in animate-pulse" title="Gecikmiş Ödeme Var">
-                                                            <AlertTriangle className="w-3 h-3" />
-                                                            <span className="hidden xl:inline">Ödeme Gecikti</span>
-                                                        </div>
-                                                    );
-                                                }
-
-                                                // Payment Completed Check
-                                                if ((project.price || 0) > 0 && projectIncome >= (project.price || 0)) {
-                                                    return (
-                                                        <div className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-green-100 text-green-700 text-xs font-bold border border-green-200 animate-in fade-in zoom-in" title="Ödeme Tamamlandı">
+                                                        <div className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-green-100 text-green-700 text-xs font-bold border border-green-200" title="Ödeme Tamamlandı">
                                                             <CheckCircle2 className="w-3 h-3" />
-                                                            <span className="hidden xl:inline">Ödeme Tamam</span>
+                                                            <span className="hidden lg:inline">Ödendi</span>
                                                         </div>
                                                     );
                                                 }
                                                 return null;
                                             })()}
+                                        </div>
+                                        <div className="flex-1 min-w-0">
+                                            <h3 className="font-semibold truncate">{project.title}</h3>
+                                            <p className="text-sm text-muted-foreground truncate">{project.client_name}</p>
+                                        </div>
+                                        <div className="hidden md:flex items-center text-sm text-muted-foreground w-32">
+                                            <Calendar className="mr-1 h-3.5 w-3.5" />
+                                            {project.start_date ? format(new Date(project.start_date), 'd MMM yyyy', { locale: tr }) : '-'}
+                                        </div>
+                                        <div className="hidden md:block font-medium w-24 text-right">
+                                            {project.price ? `₺${project.price.toLocaleString('tr-TR')}` : '₺0'}
                                         </div>
                                         <ProjectActions
                                             project={project}
@@ -530,75 +613,11 @@ export default function Projects() {
                                             onManageSelection={handleSelectionClick}
                                             onPaymentDetails={handlePaymentDetailsClick}
                                         />
-                                    </div>
-
-                                    <div className="mt-4 space-y-1">
-                                        <h3 className="font-semibold leading-none tracking-tight">{project.title}</h3>
-                                        <p className="text-sm text-muted-foreground">{project.client_name}</p>
-                                    </div>
-
-                                    <div className="mt-6 flex items-center justify-between text-sm">
-                                        <div className="flex items-center text-muted-foreground">
-                                            <Calendar className="mr-1 h-3.5 w-3.5" />
-                                            {project.start_date ? format(new Date(project.start_date), 'd MMM yyyy', { locale: tr }) : '-'}
-                                        </div>
-                                        <div className="font-medium">
-                                            {project.price ? `₺${project.price.toLocaleString('tr-TR')}` : '₺0'}
-                                        </div>
-                                    </div>
-                                </>
-                            ) : (
-                                <>
-                                    <div className={cn("shrink-0 px-2.5 py-0.5 rounded-full text-xs font-semibold w-24 text-center", getStatusColor(project.status_id))}>
-                                        {getStatusLabel(project.status_id)}
-                                    </div>
-                                    {/* List View Badges */}
-                                    <div className="flex items-center gap-2 shrink-0">
-                                        {/* @ts-ignore */}
-                                        {(project.photo_selections?.status === 'completed' || (Array.isArray(project.photo_selections) && project.photo_selections[0]?.status === 'completed')) && (
-                                            <div className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 text-xs font-bold border border-blue-200" title="Müşteri seçimini tamamladı">
-                                                <CheckCircle2 className="w-3 h-3" />
-                                                <span className="hidden lg:inline">Seçildi</span>
-                                            </div>
-                                        )}
-                                        {(() => {
-                                            const income = transactions
-                                                ?.filter(t => t.type === 'income' && t.project_id === project.id)
-                                                .reduce((sum, t) => sum + (t.amount || 0), 0) || 0;
-                                            if ((project.price || 0) > 0 && income >= (project.price || 0)) {
-                                                return (
-                                                    <div className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-green-100 text-green-700 text-xs font-bold border border-green-200" title="Ödeme Tamamlandı">
-                                                        <CheckCircle2 className="w-3 h-3" />
-                                                        <span className="hidden lg:inline">Ödendi</span>
-                                                    </div>
-                                                );
-                                            }
-                                            return null;
-                                        })()}
-                                    </div>
-                                    <div className="flex-1 min-w-0">
-                                        <h3 className="font-semibold truncate">{project.title}</h3>
-                                        <p className="text-sm text-muted-foreground truncate">{project.client_name}</p>
-                                    </div>
-                                    <div className="hidden md:flex items-center text-sm text-muted-foreground w-32">
-                                        <Calendar className="mr-1 h-3.5 w-3.5" />
-                                        {project.start_date ? format(new Date(project.start_date), 'd MMM yyyy', { locale: tr }) : '-'}
-                                    </div>
-                                    <div className="hidden md:block font-medium w-24 text-right">
-                                        {project.price ? `₺${project.price.toLocaleString('tr-TR')}` : '₺0'}
-                                    </div>
-                                    <ProjectActions
-                                        project={project}
-                                        onEdit={handleEditClick}
-                                        onDelete={handleDeleteClick}
-                                        onAddTransaction={handleTransactionClick}
-                                        onManageSelection={handleSelectionClick}
-                                        onPaymentDetails={handlePaymentDetailsClick}
-                                    />
-                                </>
-                            )}
-                        </div>
-                    ))}
+                                    </>
+                                )}
+                            </div>
+                        );
+                    })}
                 </div>
             )
             }
