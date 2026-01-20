@@ -3,13 +3,13 @@ import { getClients, deleteClient } from '../services/apiClients';
 import { getProjects } from '../services/apiProjects';
 import { getStatuses } from '../services/apiStatuses';
 import { getTransactions } from '../services/apiFinance';
-import { Plus, Search, Loader2, MoreVertical, Pencil, Trash2, Phone, Mail, MapPin, Building2, User, Eye, EyeOff, ArrowUpDown, Calendar, Wallet, FolderKanban, Users, UserCheck, UserX } from 'lucide-react';
+import { Plus, Search, Loader2, MoreVertical, Pencil, Trash2, Phone, Mail, MapPin, Building2, User, Eye, EyeOff, ArrowUpDown, Calendar, Wallet, FolderKanban, Users, UserCheck, UserX, MessageCircle } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ClientDialog } from '../components/ClientDialog';
-import type { Client, Project } from '../types';
+import type { Client } from '../types';
 import { cn } from '../lib/utils';
 import {
     DropdownMenu,
@@ -83,12 +83,12 @@ export default function Clients() {
     // Helper: Müşterinin aktif olup olmadığını kontrol et
     const isClientActive = (clientId: string): boolean => {
         if (!projects || !completedStatusId) return true; // Veri yoksa aktif say
-        
+
         const clientProjects = projects.filter(p => p.client_id === clientId);
-        
+
         // Hiç projesi yoksa pasif
         if (clientProjects.length === 0) return false;
-        
+
         // En az bir tamamlanmamış projesi varsa aktif
         return clientProjects.some(p => p.status_id !== completedStatusId);
     };
@@ -102,38 +102,38 @@ export default function Clients() {
     // Helper: Müşterinin yaklaşan proje tarihini al
     const getClientNextProjectDate = (clientId: string): Date | null => {
         if (!projects || !completedStatusId) return null;
-        
+
         const now = new Date();
         const clientProjects = projects
             .filter(p => p.client_id === clientId && p.status_id !== completedStatusId && p.start_date)
             .map(p => new Date(p.start_date!))
             .filter(d => d >= now)
             .sort((a, b) => a.getTime() - b.getTime());
-        
+
         return clientProjects[0] || null;
     };
 
     // Helper: Müşterinin yaklaşan ödeme tarihini al
     const getClientNextPaymentDate = (clientId: string): Date | null => {
         if (!projects || !transactions) return null;
-        
+
         const now = new Date();
         now.setHours(0, 0, 0, 0);
-        
+
         const clientProjects = projects.filter(p => p.client_id === clientId);
-        
+
         let nextPaymentDate: Date | null = null;
-        
+
         for (const project of clientProjects) {
             if (!project.project_installments) continue;
-            
+
             // Proje için yapılan toplam ödeme
             const projectIncome = transactions
                 .filter(t => t.type === 'income' && t.project_id === project.id)
                 .reduce((sum, t) => sum + (t.amount || 0), 0);
-            
+
             let remainingPaid = projectIncome;
-            
+
             for (const inst of project.project_installments) {
                 if (remainingPaid >= inst.amount) {
                     remainingPaid -= inst.amount;
@@ -146,17 +146,17 @@ export default function Clients() {
                 }
             }
         }
-        
+
         return nextPaymentDate;
     };
 
     // İstatistikler
     const stats = useMemo(() => {
         if (!clients) return { total: 0, active: 0, passive: 0 };
-        
+
         let active = 0;
         let passive = 0;
-        
+
         clients.forEach(client => {
             if (isClientActive(client.id)) {
                 active++;
@@ -164,7 +164,7 @@ export default function Clients() {
                 passive++;
             }
         });
-        
+
         return { total: clients.length, active, passive };
     }, [clients, projects, completedStatusId]);
 
@@ -325,23 +325,39 @@ export default function Clients() {
                 </div>
             </div>
 
-            {/* İstatistik Chip'leri */}
-            <div className="flex flex-wrap gap-2">
-                <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-slate-100 text-slate-700 text-sm font-medium">
-                    <Users className="h-4 w-4" />
-                    <span>Toplam: {stats.total}</span>
+            {/* Mini Stat Kartları */}
+            <div className="grid grid-cols-3 gap-2">
+                <div className="flex items-center gap-3 p-3 rounded-lg bg-gradient-to-br from-slate-50 to-slate-100 border border-slate-200 shadow-sm">
+                    <div className="flex items-center justify-center w-8 h-8 rounded-full bg-slate-200/80">
+                        <Users className="h-4 w-4 text-slate-600" />
+                    </div>
+                    <div>
+                        <span className="text-xl font-bold text-slate-800">{stats.total}</span>
+                        <span className="text-xs text-slate-500 font-medium ml-1">Toplam</span>
+                    </div>
                 </div>
-                <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-green-100 text-green-700 text-sm font-medium">
-                    <UserCheck className="h-4 w-4" />
-                    <span>Aktif: {stats.active}</span>
+                <div className="flex items-center gap-3 p-3 rounded-lg bg-gradient-to-br from-green-50 to-emerald-100 border border-green-200 shadow-sm">
+                    <div className="flex items-center justify-center w-8 h-8 rounded-full bg-green-200/80">
+                        <UserCheck className="h-4 w-4 text-green-600" />
+                    </div>
+                    <div>
+                        <span className="text-xl font-bold text-green-700">{stats.active}</span>
+                        <span className="text-xs text-green-600 font-medium ml-1">Aktif</span>
+                    </div>
                 </div>
-                <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-gray-100 text-gray-600 text-sm font-medium">
-                    <UserX className="h-4 w-4" />
-                    <span>Pasif: {stats.passive}</span>
+                <div className="flex items-center gap-3 p-3 rounded-lg bg-gradient-to-br from-red-50 to-red-100 border border-red-200 shadow-sm">
+                    <div className="flex items-center justify-center w-8 h-8 rounded-full bg-red-200/80">
+                        <UserX className="h-4 w-4 text-red-500" />
+                    </div>
+                    <div>
+                        <span className="text-xl font-bold text-red-600">{stats.passive}</span>
+                        <span className="text-xs text-red-500 font-medium ml-1">Pasif</span>
+                    </div>
                 </div>
             </div>
 
             {/* Arama */}
+
             <div className="relative">
                 <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
                 <Input
@@ -399,8 +415,8 @@ export default function Clients() {
                                                 {/* Aktif/Pasif Badge */}
                                                 <span className={cn(
                                                     "text-[10px] px-1.5 py-0.5 rounded-full font-medium",
-                                                    isActive 
-                                                        ? "bg-green-100 text-green-700" 
+                                                    isActive
+                                                        ? "bg-green-100 text-green-700"
                                                         : "bg-gray-100 text-gray-500"
                                                 )}>
                                                     {isActive ? 'Aktif' : 'Pasif'}
@@ -490,6 +506,18 @@ export default function Clients() {
                                         <Button variant="outline" size="sm" className="flex-1" asChild>
                                             <a href={`tel:${client.phone}`} onClick={(e) => e.stopPropagation()}>
                                                 <Phone className="mr-2 h-3 w-3" /> Ara
+                                            </a>
+                                        </Button>
+                                    )}
+                                    {client.phone && (
+                                        <Button variant="outline" size="sm" className="flex-1 text-green-600 hover:text-green-700 hover:bg-green-50" asChild>
+                                            <a
+                                                href={`https://wa.me/${client.phone.replace(/\D/g, '').replace(/^0/, '90')}`}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                onClick={(e) => e.stopPropagation()}
+                                            >
+                                                <MessageCircle className="mr-2 h-3 w-3" /> WhatsApp
                                             </a>
                                         </Button>
                                     )}
