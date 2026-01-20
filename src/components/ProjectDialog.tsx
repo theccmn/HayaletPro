@@ -134,6 +134,16 @@ export function ProjectDialog({ isOpen, onClose, projectToEdit }: ProjectDialogP
         }
     }, [isOpen, projectToEdit, reset]);
 
+    // Varsayılan status olarak "Planlandı" ayarla
+    useEffect(() => {
+        if (isOpen && !isEditMode && statuses && statuses.length > 0) {
+            const planlandiStatus = statuses.find(s => s.label?.toLowerCase() === 'planlandı');
+            if (planlandiStatus && !watch('status_id')) {
+                setValue('status_id', planlandiStatus.id);
+            }
+        }
+    }, [isOpen, isEditMode, statuses, setValue, watch]);
+
     // Initial Load - Get Settings
     useEffect(() => {
         const fetchSettings = async () => {
@@ -338,8 +348,7 @@ export function ProjectDialog({ isOpen, onClose, projectToEdit }: ProjectDialogP
                         eventPayload.end = { date: eventEndStr };
                     }
 
-                    const result = await insertEvent(eventPayload);
-                    // console.log('Project Event Inserted:', result);
+                    await insertEvent(eventPayload);
                     toast.success("Google Takvim'e eklendi.");
                 } catch (error) {
                     console.error("Calendar Sync Error:", error);
@@ -353,7 +362,7 @@ export function ProjectDialog({ isOpen, onClose, projectToEdit }: ProjectDialogP
         },
         onError: (e) => {
             console.error(e);
-            alert("Proje oluşturulurken bir hata oluştu: " + e.message);
+            toast.error("Proje oluşturulurken bir hata oluştu: " + e.message);
         }
     });
 
@@ -384,7 +393,7 @@ export function ProjectDialog({ isOpen, onClose, projectToEdit }: ProjectDialogP
             } else {
                 // Determine if we should force selection or allow "No Client"
                 // Assuming "No Client" is basically skipping selection
-                alert("Lütfen bir müşteri seçin veya yeni müşteri oluşturun.");
+                toast.error("Lütfen bir müşteri seçin veya yeni müşteri oluşturun.");
                 return;
             }
         } else if (step === 2) {
@@ -393,7 +402,7 @@ export function ProjectDialog({ isOpen, onClose, projectToEdit }: ProjectDialogP
         } else if (step === 3) {
             const statusId = watch('status_id');
             if (!statusId) {
-                alert("Lütfen bir 'Durum' seçiniz.");
+                toast.error("Lütfen bir 'Durum' seçiniz.");
                 return;
             }
 
@@ -424,11 +433,11 @@ export function ProjectDialog({ isOpen, onClose, projectToEdit }: ProjectDialogP
     // Helper functions for Payment Plan
     const addInstallment = () => {
         if (newInstallmentAmount <= 0) {
-            alert("Lütfen geçerli bir tutar giriniz.");
+            toast.error("Lütfen geçerli bir tutar giriniz.");
             return;
         }
         if (!newInstallmentDate) {
-            alert("Lütfen tarih seçiniz.");
+            toast.error("Lütfen tarih seçiniz.");
             return;
         }
 
