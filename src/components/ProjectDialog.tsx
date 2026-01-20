@@ -5,13 +5,14 @@ import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { createProject, updateProject } from '../services/apiProjects';
+import { createProject, updateProject, getProjects } from '../services/apiProjects';
 import { getClients, createClient } from '../services/apiClients';
 import { getPackages } from '../services/apiPackages';
 import { getStatuses } from '../services/apiStatuses';
 import { createInstallments } from '../services/apiInstallments';
 import { getSetting } from '../services/apiSettings';
 import { getContractSettings } from '../services/apiContract';
+import { getProjectTypes } from '../services/apiProjectTypes';
 import { Loader2, Search, Plus, Tag, Check, Package as PackageIcon, ArrowRight, ArrowLeft, X, Printer, Calculator, FileText, Calendar } from 'lucide-react';
 import { cn } from '../lib/utils';
 import type { Project, Client, Package, NewInstallment } from '../types';
@@ -34,6 +35,7 @@ const fullSchema = z.object({
     // Project
     title: z.string().min(1, "Proje başlığı zorunludur"),
     status_id: z.string().min(1, "Durum seçiniz"),
+    type_id: z.string().optional(),
     start_date: z.string().optional(), // Format: "2026-01-10T10:00|2026-01-10T14:00" veya sadece "2026-01-10T10:00"
     notes: z.string().optional(),
 
@@ -86,6 +88,8 @@ export function ProjectDialog({ isOpen, onClose, projectToEdit }: ProjectDialogP
     const { data: statuses } = useQuery({ queryKey: ['statuses'], queryFn: getStatuses });
     const { data: clients } = useQuery({ queryKey: ['clients'], queryFn: getClients });
     const { data: packages } = useQuery({ queryKey: ['packages'], queryFn: getPackages });
+    const { data: projects } = useQuery({ queryKey: ['projects'], queryFn: getProjects });
+    const { data: projectTypes } = useQuery({ queryKey: ['project_types'], queryFn: getProjectTypes });
     const { data: contractSettings } = useQuery({
         queryKey: ['contractSettings'],
         queryFn: getContractSettings,
@@ -105,6 +109,7 @@ export function ProjectDialog({ isOpen, onClose, projectToEdit }: ProjectDialogP
         shouldUnregister: false,
         defaultValues: {
             title: '',
+            type_id: '',
             status_id: '',
             is_new_client: false,
             custom_price: 0
@@ -188,6 +193,7 @@ export function ProjectDialog({ isOpen, onClose, projectToEdit }: ProjectDialogP
             // Populate form...
             setValue('title', projectToEdit.title);
             setValue('status_id', projectToEdit.status_id);
+            setValue('type_id', projectToEdit.type_id || '');
 
             // Format start and end date for DateTimePicker (start|end)
             let dateValue = projectToEdit.start_date || '';
@@ -239,6 +245,7 @@ export function ProjectDialog({ isOpen, onClose, projectToEdit }: ProjectDialogP
                 start_date: startDate ? (startDate.includes('T') ? new Date(startDate).toISOString() : new Date(`${startDate}T09:00:00`).toISOString()) : undefined,
                 end_date: endDate ? new Date(endDate).toISOString() : undefined,
                 notes: data.notes || undefined,
+                type_id: data.type_id || null,
                 price: data.custom_price || 0,
                 details: selectedPackage
                     ? `Paket: ${selectedPackage.name}`
@@ -708,35 +715,48 @@ Tarih: {{TARIH}}`;
                     </div>
                 </button>
 
-                {filteredClients?.map(client => (
-                    <button
-                        key={client.id}
-                        type="button"
-                        onClick={() => { setSelectedClient(client); setIsNewClientMode(false); setValue('is_new_client', false); }}
-                        className={cn(
-                            "w-full flex items-center justify-between p-3 rounded-md border hover:bg-muted/50 transition-colors",
-                            selectedClient?.id === client.id ? "border-primary bg-primary/5 ring-1 ring-primary" : "border-transparent bg-card"
-                        )}
-                    >
-                        <div className="flex items-center">
-                            <div className="h-8 w-8 rounded-full bg-muted flex items-center justify-center mr-3 text-sm font-semibold">
-                                {client.name.charAt(0)}
-                            </div>
-                            <div className="text-left">
-                                <div className="font-medium">{client.name}</div>
-                                {client.company && <div className="text-xs text-muted-foreground">{client.company}</div>}
-                            </div>
-                        </div>
-                        <div className="flex items-center gap-2">
-                            {client.status === 'active' ? (
-                                <span className="text-[10px] px-2 py-0.5 rounded-full bg-green-100 text-green-700 font-medium">Aktif</span>
-                            ) : (
-                                <span className="text-[10px] px-2 py-0.5 rounded-full bg-gray-100 text-gray-600">Pasif</span>
+                {filteredClients?.map(client => {
+                    // Dinamik Aktiflik Kontrolü
+                    const clientProjects = projects?.filter(p => p.client_id === client.id) || [];
+
+                    // Tamamlanmamış projesi var mı?
+                    const activeProjects = clientProjects.filter(p => {
+                        const status = statuses?.find(s => s.id === p.status_id);
+                        return status?.label?.toLowerCase() !== 'tamamlandı';
+                    });
+
+                    const isActive = activeProjects.length > 0;
+
+                    return (
+                        <button
+                            key={client.id}
+                            type="button"
+                            onClick={() => { setSelectedClient(client); setIsNewClientMode(false); setValue('is_new_client', false); }}
+                            className={cn(
+                                "w-full flex items-center justify-between p-3 rounded-md border hover:bg-muted/50 transition-colors",
+                                selectedClient?.id === client.id ? "border-primary bg-primary/5 ring-1 ring-primary" : "border-transparent bg-card"
                             )}
-                            {selectedClient?.id === client.id && <Check className="h-4 w-4 text-primary" />}
-                        </div>
-                    </button>
-                ))}
+                        >
+                            <div className="flex items-center">
+                                <div className="h-8 w-8 rounded-full bg-muted flex items-center justify-center mr-3 text-sm font-semibold">
+                                    {client.name.charAt(0)}
+                                </div>
+                                <div className="text-left">
+                                    <div className="font-medium">{client.name}</div>
+                                    {client.company && <div className="text-xs text-muted-foreground">{client.company}</div>}
+                                </div>
+                            </div>
+                            <div className="flex items-center gap-2">
+                                {isActive ? (
+                                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-green-100 text-green-700 font-medium border border-green-200">Aktif</span>
+                                ) : (
+                                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-gray-100 text-gray-500 border border-gray-200">Pasif</span>
+                                )}
+                                {selectedClient?.id === client.id && <Check className="h-4 w-4 text-primary" />}
+                            </div>
+                        </button>
+                    );
+                })}
 
                 {filteredClients?.length === 0 && !isNewClientMode && (
                     <div className="text-center p-4 text-muted-foreground text-sm">
@@ -788,6 +808,16 @@ Tarih: {{TARIH}}`;
                         {statuses?.map(s => <option key={s.id} value={s.id}>{s.label}</option>)}
                     </select>
                     {errors.status_id && <span className="text-xs text-red-500">{errors.status_id.message}</span>}
+                </div>
+                <div className="grid gap-2">
+                    <Label>Proje Türü</Label>
+                    <select
+                        className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                        {...register('type_id')}
+                    >
+                        <option value="">Seçiniz (Opsiyonel)</option>
+                        {projectTypes?.map(t => <option key={t.id} value={t.id}>{t.label}</option>)}
+                    </select>
                 </div>
                 <div className="grid gap-2">
                     <Label>Notlar</Label>

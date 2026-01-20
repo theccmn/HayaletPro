@@ -128,6 +128,7 @@ export function KanbanBoard({ projects, statuses, transactions, onStatusChange, 
                                 onAddTransaction={onAddTransaction}
                                 onManageSelection={onManageSelection}
                                 onPaymentDetails={onPaymentDetails}
+                                color={col.color}
                             />
                         ))}
                         {provided.placeholder}

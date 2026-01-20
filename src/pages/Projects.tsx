@@ -1,11 +1,7 @@
-// Removed unused import
-// Removed unused import
-// Removed unused import
-// Removed unused import
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { deleteProject, getProjects, updateProjectStatus } from '../services/apiProjects';
 import type { Project } from '../types';
-import { Plus, LayoutGrid, List as ListIcon, Loader2, Calendar, MoreVertical, Pencil, Trash2, Eye, EyeOff, ArrowUpDown, ArrowUp, ArrowDown, Wallet, Settings2, Kanban as KanbanIcon, CheckCircle2, ZoomIn, ZoomOut, Clock, Search, AlertTriangle } from 'lucide-react';
+import { Plus, LayoutGrid, List as ListIcon, Loader2, Calendar, MoreVertical, Pencil, Trash2, Eye, EyeOff, ArrowUpDown, ArrowUp, ArrowDown, Wallet, Settings2, Kanban as KanbanIcon, CheckCircle2, ZoomIn, ZoomOut, Clock, Search, AlertTriangle, Tag } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { useState } from 'react';
 import { cn } from '../lib/utils';
@@ -14,10 +10,12 @@ import { tr } from 'date-fns/locale';
 import { ProjectDialog } from '../components/ProjectDialog';
 import { KanbanBoard } from '../components/KanbanBoard';
 import { getStatuses } from '../services/apiStatuses';
+import { TypeManagerDialog } from '../components/TypeManagerDialog';
 import { StatusManagerDialog } from '../components/StatusManagerDialog';
 import { SelectionManagerDialog } from '../components/SelectionManagerDialog';
 import { PaymentDetailsDialog } from '../components/PaymentDetailsDialog';
 import { getTransactions } from '../services/apiFinance';
+import { useNavigate } from 'react-router-dom';
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -35,6 +33,7 @@ import {
     AlertDialogTitle,
 } from "../components/ui/alert-dialog";
 import { TransactionDialog } from '../components/TransactionDialog';
+
 
 const ProjectActions = ({
     project,
@@ -86,11 +85,13 @@ const ProjectActions = ({
 );
 
 export default function Projects() {
+    const navigate = useNavigate();
     const [viewMode, setViewMode] = useState<'grid' | 'list' | 'kanban'>('grid');
     const [cardSize, setCardSize] = useState<'sm' | 'md' | 'lg'>('md');
     const [sortBy, setSortBy] = useState<'date_desc' | 'date_asc' | 'price_desc' | 'price_asc' | 'name_asc' | 'status'>('date_desc');
     const [isProjectDialogOpen, setIsProjectDialogOpen] = useState(false);
     const [isStatusManagerOpen, setIsStatusManagerOpen] = useState(false);
+    const [isTypeManagerOpen, setIsTypeManagerOpen] = useState(false);
     const [showCompleted, setShowCompleted] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
 
@@ -395,6 +396,9 @@ export default function Projects() {
                     <Button variant="outline" size="icon" onClick={() => setIsStatusManagerOpen(true)} title="Durumları Yönet">
                         <Settings2 className="h-4 w-4" />
                     </Button>
+                    <Button variant="outline" size="icon" onClick={() => setIsTypeManagerOpen(true)} title="Türleri Yönet">
+                        <Tag className="h-4 w-4" />
+                    </Button>
                     <Button onClick={handleCreateClick}>
                         <Plus className="mr-2 h-4 w-4" /> Yeni Proje
                     </Button>
@@ -462,23 +466,63 @@ export default function Projects() {
                         return (
                             <div
                                 key={project.id}
+                                onClick={(e) => {
+                                    // Prevent navigation if clicking on dropdown triggers or buttons
+                                    if ((e.target as HTMLElement).closest('button, [role="menuitem"]')) return;
+                                    navigate(`/projects/${project.id}`)
+                                }}
                                 className={cn(
-                                    "group relative rounded-xl border bg-card text-card-foreground shadow-sm transition-all hover:shadow-md",
+                                    "group relative rounded-xl border bg-card text-card-foreground shadow-sm transition-all hover:shadow-md cursor-pointer",
                                     isOverdue
                                         ? "border-red-300 bg-red-50/50 dark:bg-red-950/20 ring-2 ring-red-400"
                                         : isPaymentComplete
                                             ? "border-green-200 bg-green-50/50"
                                             : "",
-                                    viewMode === 'list' ? "flex items-center p-4 gap-4" : "p-6"
+                                    viewMode === 'list' ? "flex items-center p-4 gap-4" : "p-0 overflow-hidden flex flex-col"
                                 )}
                             >
                                 {viewMode === 'grid' ? (
                                     <>
-                                        <div className="flex items-start justify-between">
-                                            <div className="flex items-center gap-2">
-                                                <div className={cn("px-2.5 py-0.5 rounded-full text-xs font-semibold", getStatusColor(project.status_id))}>
-                                                    {getStatusLabel(project.status_id)}
+                                        {/* Type Header */}
+                                        {project.project_types && (
+                                            <div className={cn("w-full px-4 py-1.5 text-[10px] font-extrabold uppercase tracking-widest text-center border-b", project.project_types.color)}>
+                                                {project.project_types.label}
+                                            </div>
+                                        )}
+
+                                        {/* Status Header/Strip */}
+                                        <div className={cn("w-full px-4 py-1 text-xs font-bold text-center border-b", getStatusColor(project.status_id))}>
+                                            {getStatusLabel(project.status_id)}
+                                        </div>
+
+                                        <div className="p-5 flex flex-col gap-4 flex-1">
+                                            <div className="flex items-start justify-between">
+                                                <div className="space-y-1">
+                                                    <h3 className="font-semibold leading-none tracking-tight text-lg">{project.title}</h3>
+                                                    <p className="text-sm text-muted-foreground">{project.client_name}</p>
                                                 </div>
+                                                <ProjectActions
+                                                    project={project}
+                                                    onEdit={handleEditClick}
+                                                    onDelete={handleDeleteClick}
+                                                    onAddTransaction={handleTransactionClick}
+                                                    onManageSelection={handleSelectionClick}
+                                                    onPaymentDetails={handlePaymentDetailsClick}
+                                                />
+                                            </div>
+
+                                            <div className="flex items-center justify-between text-sm mt-auto">
+                                                <div className="flex items-center text-muted-foreground">
+                                                    <Calendar className="mr-1 h-3.5 w-3.5" />
+                                                    {project.start_date ? format(new Date(project.start_date), 'd MMM yyyy', { locale: tr }) : '-'}
+                                                </div>
+                                                <div className="font-medium">
+                                                    {project.price ? `₺${project.price.toLocaleString('tr-TR')}` : '₺0'}
+                                                </div>
+                                            </div>
+
+                                            {/* Footer Alerts */}
+                                            <div className="flex flex-wrap items-center gap-2 pt-3 border-t min-h-[40px]">
                                                 {/* @ts-ignore */}
                                                 {(project.photo_selections?.status === 'completed' || (Array.isArray(project.photo_selections) && project.photo_selections[0]?.status === 'completed')) && (
                                                     <div className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 text-xs font-bold border border-blue-200 animate-in fade-in zoom-in" title="Müşteri seçimini tamamladı">
@@ -540,38 +584,30 @@ export default function Projects() {
                                                     return null;
                                                 })()}
                                             </div>
-                                            <ProjectActions
-                                                project={project}
-                                                onEdit={handleEditClick}
-                                                onDelete={handleDeleteClick}
-                                                onAddTransaction={handleTransactionClick}
-                                                onManageSelection={handleSelectionClick}
-                                                onPaymentDetails={handlePaymentDetailsClick}
-                                            />
-                                        </div>
-
-                                        <div className="mt-4 space-y-1">
-                                            <h3 className="font-semibold leading-none tracking-tight">{project.title}</h3>
-                                            <p className="text-sm text-muted-foreground">{project.client_name}</p>
-                                        </div>
-
-                                        <div className="mt-6 flex items-center justify-between text-sm">
-                                            <div className="flex items-center text-muted-foreground">
-                                                <Calendar className="mr-1 h-3.5 w-3.5" />
-                                                {project.start_date ? format(new Date(project.start_date), 'd MMM yyyy', { locale: tr }) : '-'}
-                                            </div>
-                                            <div className="font-medium">
-                                                {project.price ? `₺${project.price.toLocaleString('tr-TR')}` : '₺0'}
-                                            </div>
                                         </div>
                                     </>
                                 ) : (
                                     <>
-                                        <div className={cn("shrink-0 px-2.5 py-0.5 rounded-full text-xs font-semibold w-24 text-center", getStatusColor(project.status_id))}>
-                                            {getStatusLabel(project.status_id)}
+                                        {/* Left Column: Type & Status */}
+                                        <div className="flex flex-col gap-1.5 shrink-0 w-24 items-center self-start pt-1">
+                                            {project.project_types && (
+                                                <div className={cn("w-full py-1 rounded-sm text-[9px] font-extrabold uppercase tracking-widest text-center border shadow-sm", project.project_types.color)}>
+                                                    {project.project_types.label}
+                                                </div>
+                                            )}
+                                            <div className={cn("w-full py-0.5 rounded-full text-[10px] font-bold text-center border shadow-sm", getStatusColor(project.status_id))}>
+                                                {getStatusLabel(project.status_id)}
+                                            </div>
                                         </div>
-                                        {/* List View Badges */}
-                                        <div className="flex items-center gap-2 shrink-0">
+
+                                        {/* Title & Client */}
+                                        <div className="flex-1 min-w-0 pl-2">
+                                            <h3 className="font-semibold truncate text-base">{project.title}</h3>
+                                            <p className="text-sm text-muted-foreground truncate">{project.client_name}</p>
+                                        </div>
+
+                                        {/* Tags */}
+                                        <div className="hidden xl:flex items-center gap-2 shrink-0">
                                             {/* @ts-ignore */}
                                             {(project.photo_selections?.status === 'completed' || (Array.isArray(project.photo_selections) && project.photo_selections[0]?.status === 'completed')) && (
                                                 <div className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 text-xs font-bold border border-blue-200" title="Müşteri seçimini tamamladı">
@@ -583,7 +619,9 @@ export default function Projects() {
                                                 const income = transactions
                                                     ?.filter(t => t.type === 'income' && t.project_id === project.id)
                                                     .reduce((sum, t) => sum + (t.amount || 0), 0) || 0;
-                                                if ((project.price || 0) > 0 && income >= (project.price || 0)) {
+                                                const price = project.price || 0;
+
+                                                if (price > 0 && income >= price) {
                                                     return (
                                                         <div className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-green-100 text-green-700 text-xs font-bold border border-green-200" title="Ödeme Tamamlandı">
                                                             <CheckCircle2 className="w-3 h-3" />
@@ -594,10 +632,8 @@ export default function Projects() {
                                                 return null;
                                             })()}
                                         </div>
-                                        <div className="flex-1 min-w-0">
-                                            <h3 className="font-semibold truncate">{project.title}</h3>
-                                            <p className="text-sm text-muted-foreground truncate">{project.client_name}</p>
-                                        </div>
+
+                                        {/* Date/Price */}
                                         <div className="hidden md:flex items-center text-sm text-muted-foreground w-32">
                                             <Calendar className="mr-1 h-3.5 w-3.5" />
                                             {project.start_date ? format(new Date(project.start_date), 'd MMM yyyy', { locale: tr }) : '-'}
@@ -605,6 +641,7 @@ export default function Projects() {
                                         <div className="hidden md:block font-medium w-24 text-right">
                                             {project.price ? `₺${project.price.toLocaleString('tr-TR')}` : '₺0'}
                                         </div>
+
                                         <ProjectActions
                                             project={project}
                                             onEdit={handleEditClick}
@@ -650,6 +687,22 @@ export default function Projects() {
                 isOpen={isStatusManagerOpen}
                 onClose={() => setIsStatusManagerOpen(false)}
             />
+
+            <TypeManagerDialog
+                isOpen={isTypeManagerOpen}
+                onClose={() => setIsTypeManagerOpen(false)}
+            />
+
+            {projectForTransaction && (
+                <TransactionDialog
+                    isOpen={isTransactionDialogOpen}
+                    onClose={() => {
+                        setIsTransactionDialogOpen(false);
+                        setProjectForTransaction(null);
+                    }}
+                    defaultProjectId={projectForTransaction.id}
+                />
+            )}
 
             <AlertDialog open={!!projectToDelete} onOpenChange={(open) => !open && setProjectToDelete(null)}>
                 <AlertDialogContent>

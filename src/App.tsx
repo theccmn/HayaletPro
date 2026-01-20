@@ -14,6 +14,8 @@ import { GoogleAuthProviderWrapper } from './components/GoogleAuthProviderWrappe
 
 
 
+import ProjectDetail from './pages/ProjectDetail';
+
 function App() {
   return (
     <BrowserRouter>
@@ -27,6 +29,7 @@ function App() {
             <Route index element={<Navigate to="/dashboard" replace />} />
             <Route path="dashboard" element={<Dashboard />} />
             <Route path="projects" element={<Projects />} />
+            <Route path="projects/:id" element={<ProjectDetail />} />
             <Route path="calendar" element={<Calendar />} />
             <Route path="finance" element={<Finance />} />
             <Route path="clients" element={<Clients />} />

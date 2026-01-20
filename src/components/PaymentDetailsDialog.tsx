@@ -265,7 +265,7 @@ export function PaymentDetailsDialog({ isOpen, onClose, project }: PaymentDetail
                                                     type="date"
                                                     value={editDate}
                                                     onChange={(e) => setEditDate(e.target.value)}
-                                                    className="h-8 w-32"
+                                                    className="h-8 w-40"
                                                 />
                                                 <Input
                                                     value={editNote}
@@ -343,7 +343,7 @@ export function PaymentDetailsDialog({ isOpen, onClose, project }: PaymentDetail
                             type="date"
                             value={newDate}
                             onChange={e => setNewDate(e.target.value)}
-                            className="w-32"
+                            className="w-40"
                         />
                         <Input
                             placeholder="Not"

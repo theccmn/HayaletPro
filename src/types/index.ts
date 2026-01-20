@@ -5,6 +5,13 @@ export interface ProjectStatus {
     color: string;
 }
 
+export interface ProjectType {
+    id: string;
+    label: string;
+    order: number;
+    color: string;
+}
+
 export interface Project {
     id: string;
     title: string;
@@ -13,14 +20,16 @@ export interface Project {
     email?: string;
     start_date?: string;
     end_date?: string;
-    status_id: string; // Updated to reference ProjectStatus
+    status_id: string;
+    type_id?: string | null; // Added
+    project_types?: ProjectType; // Joined data
     details?: string;
     notes?: string;
     price?: number;
     client_id?: string | null;
     created_at?: string;
     photo_selections?: any;
-    project_installments?: Installment[]; // Added for payment tracking
+    project_installments?: Installment[];
 }
 
 // Transaction Interface
