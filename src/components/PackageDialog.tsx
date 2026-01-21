@@ -7,7 +7,10 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { createPackage, updatePackage } from '../services/apiPackages';
 import type { Package } from '../types';
 import { useEffect } from 'react';
-import { Loader2, Plus, X } from 'lucide-react';
+import { Loader2, Plus } from 'lucide-react';
+import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors, type DragEndEvent } from '@dnd-kit/core';
+import { SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy } from '@dnd-kit/sortable';
+import { SortableFeatureItem } from './SortableFeatureItem';
 
 interface PackageDialogProps {
     isOpen: boolean;
@@ -33,10 +36,17 @@ export function PackageDialog({ isOpen, onClose, itemToEdit }: PackageDialogProp
         }
     });
 
-    const { fields, append, remove } = useFieldArray({
+    const { fields, append, remove, move } = useFieldArray({
         control,
         name: "features"
     });
+
+    const sensors = useSensors(
+        useSensor(PointerSensor),
+        useSensor(KeyboardSensor, {
+            coordinateGetter: sortableKeyboardCoordinates,
+        })
+    );
 
     useEffect(() => {
         if (isOpen) {
@@ -80,6 +90,16 @@ export function PackageDialog({ isOpen, onClose, itemToEdit }: PackageDialogProp
         mutation.mutate(data);
     };
 
+    const handleDragEnd = (event: DragEndEvent) => {
+        const { active, over } = event;
+
+        if (over && active.id !== over.id) {
+            const oldIndex = fields.findIndex(f => f.id === active.id);
+            const newIndex = fields.findIndex(f => f.id === over.id);
+            move(oldIndex, newIndex);
+        }
+    };
+
     return (
         <Dialog
             isOpen={isOpen}
@@ -104,25 +124,36 @@ export function PackageDialog({ isOpen, onClose, itemToEdit }: PackageDialogProp
                 </div>
 
                 <div className="grid gap-2">
-                    <Label>Özellikler (Madde Madde)</Label>
-                    <div className="space-y-2 max-h-[200px] overflow-y-auto border rounded p-2">
-                        {fields.map((field, index) => (
-                            <div key={field.id} className="flex gap-2">
-                                <Input
-                                    {...register(`features.${index}.value`)}
-                                    placeholder="Örn. 2 Saat Çekim"
-                                    className="h-8 text-sm"
-                                />
-                                <Button type="button" variant="ghost" size="icon" className="h-8 w-8 text-red-500" onClick={() => remove(index)}>
-                                    <X className="h-4 w-4" />
-                                </Button>
-                            </div>
-                        ))}
+                    <Label>Özellikler (Sıralamak için sürükleyin)</Label>
+                    <div className="space-y-2 max-h-[300px] overflow-y-auto border rounded p-2 bg-slate-50/50">
+                        <DndContext
+                            sensors={sensors}
+                            collisionDetection={closestCenter}
+                            onDragEnd={handleDragEnd}
+                        >
+                            <SortableContext
+                                items={fields.map(f => f.id)}
+                                strategy={verticalListSortingStrategy}
+                            >
+                                <div className="space-y-2">
+                                    {fields.map((field, index) => (
+                                        <SortableFeatureItem
+                                            key={field.id}
+                                            id={field.id}
+                                            index={index}
+                                            register={register}
+                                            onRemove={remove}
+                                        />
+                                    ))}
+                                </div>
+                            </SortableContext>
+                        </DndContext>
+
                         <Button
                             type="button"
                             variant="outline"
                             size="sm"
-                            className="w-full text-xs dashed border-primary/50 text-primary hover:bg-primary/5"
+                            className="w-full text-xs dashed border-primary/50 text-primary hover:bg-primary/5 mt-2"
                             onClick={() => append({ value: '' })}
                         >
                             <Plus className="h-3 w-3 mr-1" /> Özellik Ekle

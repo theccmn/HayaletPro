@@ -22,6 +22,9 @@ import { format } from 'date-fns';
 import { tr } from 'date-fns/locale';
 import { insertEvent, checkConnection } from '../services/apiGoogleCalendar';
 import { toast } from 'sonner';
+import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors, type DragEndEvent } from '@dnd-kit/core';
+import { arrayMove, SortableContext, sortableKeyboardCoordinates, rectSortingStrategy } from '@dnd-kit/sortable';
+import { SortableTag } from './SortableTag';
 
 // Combined Schema for final submission check
 const fullSchema = z.object({
@@ -83,6 +86,26 @@ export function ProjectDialog({ isOpen, onClose, projectToEdit }: ProjectDialogP
     useEffect(() => {
         checkConnection().then(setIsCalendarConnected);
     }, [isOpen]);
+
+    // DnD Sensors
+    const sensors = useSensors(
+        useSensor(PointerSensor),
+        useSensor(KeyboardSensor, {
+            coordinateGetter: sortableKeyboardCoordinates,
+        })
+    );
+
+    const handleDragEnd = (event: DragEndEvent) => {
+        const { active, over } = event;
+
+        if (over && active.id !== over.id) {
+            setCustomFeatures((items) => {
+                const oldIndex = items.indexOf(active.id.toString());
+                const newIndex = items.indexOf(over.id.toString());
+                return arrayMove(items, oldIndex, newIndex);
+            });
+        }
+    };
 
     // Queries
     const { data: statuses } = useQuery({ queryKey: ['statuses'], queryFn: getStatuses });
@@ -258,9 +281,9 @@ export function ProjectDialog({ isOpen, onClose, projectToEdit }: ProjectDialogP
                 type_id: data.type_id || null,
                 price: data.custom_price || 0,
                 details: selectedPackage
-                    ? `Paket: ${selectedPackage.name}`
+                    ? `Paket: ${selectedPackage.name}${customFeatures.length > 0 ? ` | Özellikler: ${customFeatures.join(', ')}` : ''}`
                     : customFeatures.length > 0
-                        ? `Özel Paket: ${customFeatures.join(', ')}`
+                        ? `Özel Paket | Özellikler: ${customFeatures.join(', ')}`
                         : undefined
             };
 
@@ -480,7 +503,8 @@ export function ProjectDialog({ isOpen, onClose, projectToEdit }: ProjectDialogP
 
         // Delivery content (package features) - Liste halinde
         let deliveryContent = "";
-        const features = selectedPackage ? selectedPackage.features : customFeatures;
+        // Always use customFeatures as it is the source of truth for the current project
+        const features = customFeatures;
         if (features && features.length > 0) {
             features.forEach((feature) => {
                 deliveryContent += `• ${feature}\n`;
@@ -842,125 +866,151 @@ Tarih: {{TARIH}}`;
 
     const renderStep4_Packages = () => (
         <div className="space-y-4 animate-in slide-in-from-right-4 fade-in duration-300">
-            <div className="grid grid-cols-1 gap-3 max-h-[400px] overflow-y-auto">
-                <div
-                    onClick={() => {
-                        if (selectedPackage !== null) {
-                            setSelectedPackage(null);
-                            setValue('custom_price', 0);
-                        }
-                    }}
-                    className={cn(
-                        "flex items-start p-4 rounded-xl border text-left transition-all cursor-pointer",
-                        selectedPackage === null ? "border-primary bg-primary/5 ring-1 ring-primary" : "border-border hover:bg-muted/50"
-                    )}
-                >
-                    <div className="flex-1">
-                        <div className="font-semibold flex items-center">
-                            <PackageIcon className="h-4 w-4 mr-2" /> Özel / Paketsiz
+            {/* 1. Package Selection List */}
+            <div className="space-y-2">
+                <Label>Paket Seçimi (Başlangıç)</Label>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-[220px] overflow-y-auto p-1">
+                    <div
+                        onClick={() => {
+                            if (selectedPackage !== null) {
+                                setSelectedPackage(null);
+                                setValue('custom_price', 0);
+                                setCustomFeatures([]);
+                            }
+                        }}
+                        className={cn(
+                            "flex items-start p-3 rounded-lg border text-left transition-all cursor-pointer h-24",
+                            selectedPackage === null ? "border-primary bg-primary/5 ring-1 ring-primary" : "border-border hover:bg-muted/50"
+                        )}
+                    >
+                        <div className="flex-1">
+                            <div className="font-semibold flex items-center text-sm">
+                                <PackageIcon className="h-4 w-4 mr-2" /> Özel / Paketsiz
+                            </div>
+                            <div className="text-xs text-muted-foreground mt-1 line-clamp-2">
+                                Sıfırdan kendi içeriğinizi oluşturun.
+                            </div>
                         </div>
-                        <div className="text-sm text-muted-foreground mt-1">
-                            Kendi fiyatınızı ve özelliklerinizi belirleyin.
-                        </div>
+                    </div>
 
-                        {selectedPackage === null && (
-                            <div className="mt-4 space-y-4 animate-in slide-in-from-top-2">
-                                <div className="text-sm font-medium text-primary">
-                                    <Label>Fiyat (₺)</Label>
-                                    <Input
-                                        type="number"
-                                        className="mt-1 w-32 bg-white"
-                                        {...register('custom_price', { valueAsNumber: true })}
-                                        onClick={(e) => e.stopPropagation()}
-                                    />
+                    {packages?.map(pkg => (
+                        <div
+                            key={pkg.id}
+                            onClick={() => {
+                                setSelectedPackage(pkg);
+                                setValue('custom_price', pkg.price);
+                                setCustomFeatures(pkg.features || []);
+                                setValue('package_id', pkg.id);
+                            }}
+                            className={cn(
+                                "flex items-start p-3 rounded-lg border text-left transition-all cursor-pointer h-24",
+                                selectedPackage?.id === pkg.id ? "border-primary bg-primary/5 ring-1 ring-primary" : "border-border hover:bg-muted/50"
+                            )}
+                        >
+                            <div className="flex-1">
+                                <div className="flex justify-between items-center mb-1">
+                                    <div className="font-semibold text-sm line-clamp-1">{pkg.name}</div>
+                                    <div className="font-bold text-primary text-xs">₺{pkg.price.toLocaleString('tr-TR')}</div>
                                 </div>
+                                <div className="text-xs text-muted-foreground line-clamp-2">{pkg.description}</div>
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            </div>
 
-                                <div className="space-y-2">
-                                    <Label>Paket Özellikleri</Label>
-                                    <div className="flex gap-2">
-                                        <Input
-                                            value={newFeatureInput}
-                                            onChange={(e) => setNewFeatureInput(e.target.value)}
-                                            placeholder="Örn. 2 Saat Çekim"
-                                            className="bg-white h-8 text-sm"
-                                            onClick={(e) => e.stopPropagation()}
-                                            onKeyDown={(e) => {
-                                                if (e.key === 'Enter') {
-                                                    e.preventDefault();
-                                                    e.stopPropagation();
-                                                    if (newFeatureInput.trim()) {
-                                                        setCustomFeatures([...customFeatures, newFeatureInput.trim()]);
-                                                        setNewFeatureInput('');
-                                                    }
-                                                }
+            <div className="h-px bg-border/50 my-2" />
+
+            {/* 2. Customization Area (Always Visible) */}
+            <div className="space-y-4 animate-in slide-in-from-bottom-2">
+                <div className="flex items-center justify-between">
+                    <Label className="text-base font-semibold">
+                        {selectedPackage ? `${selectedPackage.name} - İçerik Düzenle` : 'Proje İçeriği ve Fiyat'}
+                    </Label>
+                    <div className="flex items-center gap-2">
+                        <Label className="text-sm">Fiyat (₺)</Label>
+                        <Input
+                            type="number"
+                            className="w-32 bg-white h-9"
+                            {...register('custom_price', { valueAsNumber: true })}
+                        />
+                    </div>
+                </div>
+
+                <div className="space-y-2 border rounded-lg p-3 bg-muted/10">
+                    <Label>Paket Özellikleri</Label>
+                    <div className="flex gap-2">
+                        <Input
+                            value={newFeatureInput}
+                            onChange={(e) => setNewFeatureInput(e.target.value)}
+                            placeholder="Örn. 2 Saat Çekim"
+                            className="bg-white h-9 text-sm"
+                            onKeyDown={(e) => {
+                                if (e.key === 'Enter') {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    const val = newFeatureInput.trim();
+                                    if (val) {
+                                        if (customFeatures.includes(val)) {
+                                            toast.error('Bu özellik zaten listede mevcut.');
+                                            return;
+                                        }
+                                        setCustomFeatures([...customFeatures, val]);
+                                        setNewFeatureInput('');
+                                    }
+                                }
+                            }}
+                        />
+                        <Button
+                            type="button"
+                            size="sm"
+                            className="h-9 px-4"
+                            onClick={() => {
+                                const val = newFeatureInput.trim();
+                                if (val) {
+                                    if (customFeatures.includes(val)) {
+                                        toast.error('Bu özellik zaten listede mevcut.');
+                                        return;
+                                    }
+                                    setCustomFeatures([...customFeatures, val]);
+                                    setNewFeatureInput('');
+                                }
+                            }}
+                        >
+                            Ekle
+                        </Button>
+                    </div>
+
+                    <div className="flex flex-wrap gap-2 mt-2 min-h-[40px] p-2 bg-white rounded border border-dashed">
+                        {customFeatures.length > 0 ? (
+                            <DndContext
+                                sensors={sensors}
+                                collisionDetection={closestCenter}
+                                onDragEnd={handleDragEnd}
+                            >
+                                <SortableContext
+                                    items={customFeatures}
+                                    strategy={rectSortingStrategy}
+                                >
+                                    {customFeatures.map((feature, index) => (
+                                        <SortableTag
+                                            key={feature} // Assuming unique strings for now
+                                            id={feature}
+                                            feature={feature}
+                                            onRemove={() => {
+                                                setCustomFeatures(customFeatures.filter((_, i) => i !== index));
                                             }}
                                         />
-                                        <Button
-                                            type="button"
-                                            size="sm"
-                                            className="h-8"
-                                            onClick={(e) => {
-                                                e.stopPropagation();
-                                                if (newFeatureInput.trim()) {
-                                                    setCustomFeatures([...customFeatures, newFeatureInput.trim()]);
-                                                    setNewFeatureInput('');
-                                                }
-                                            }}
-                                        >
-                                            Ekle
-                                        </Button>
-                                    </div>
-
-                                    {customFeatures.length > 0 && (
-                                        <div className="flex flex-wrap gap-2 mt-2">
-                                            {customFeatures.map((feature, index) => (
-                                                <div key={index} className="flex items-center gap-1 bg-white border rounded px-2 py-1 text-sm shadow-sm">
-                                                    <span>{feature}</span>
-                                                    <button
-                                                        type="button"
-                                                        onClick={(e) => {
-                                                            e.stopPropagation();
-                                                            setCustomFeatures(customFeatures.filter((_, i) => i !== index));
-                                                        }}
-                                                        className="text-muted-foreground hover:text-red-500"
-                                                    >
-                                                        <X className="h-3 w-3" />
-                                                    </button>
-                                                </div>
-                                            ))}
-                                        </div>
-                                    )}
-                                </div>
+                                    ))}
+                                </SortableContext>
+                            </DndContext>
+                        ) : (
+                            <div className="w-full text-center text-xs text-muted-foreground py-2 italic">
+                                Henüz özellik eklenmedi. Yukarıdan ekleyebilir veya bir paket seçebilirsiniz.
                             </div>
                         )}
                     </div>
                 </div>
-
-                {packages?.map(pkg => (
-                    <div
-                        key={pkg.id}
-                        onClick={() => { setSelectedPackage(pkg); setValue('custom_price', pkg.price); setValue('package_id', pkg.id); }}
-                        className={cn(
-                            "flex items-start p-4 rounded-xl border text-left transition-all cursor-pointer",
-                            selectedPackage?.id === pkg.id ? "border-primary bg-primary/5 ring-1 ring-primary" : "border-border hover:bg-muted/50"
-                        )}
-                    >
-                        <div className="flex-1">
-                            <div className="flex justify-between items-center">
-                                <div className="font-semibold">{pkg.name}</div>
-                                <div className="font-bold text-primary">₺{pkg.price.toLocaleString('tr-TR')}</div>
-                            </div>
-                            <div className="text-sm text-muted-foreground mt-1">{pkg.description}</div>
-                            {pkg.features && (
-                                <div className="flex flex-wrap gap-1 mt-2">
-                                    {pkg.features.map((f, i) => (
-                                        <span key={i} className="text-[10px] bg-muted px-1.5 py-0.5 rounded text-muted-foreground">{f}</span>
-                                    ))}
-                                </div>
-                            )}
-                        </div>
-                    </div>
-                ))}
             </div>
         </div>
     );
@@ -1114,22 +1164,26 @@ Tarih: {{TARIH}}`;
                         <span className="text-muted-foreground">Paket / Tutar</span>
                         <div className="text-right">
                             <div className="font-bold text-lg text-primary">₺{formData.custom_price?.toLocaleString('tr-TR')}</div>
-                            {selectedPackage ? (
-                                <div className="text-xs text-muted-foreground">{selectedPackage.name}</div>
-                            ) : customFeatures.length > 0 ? (
-                                <div className="text-xs text-muted-foreground">
-                                    <div className="font-medium mb-1">Özel Paket Özellikleri:</div>
-                                    <ul className="list-disc list-inside">
+
+                            {selectedPackage && (
+                                <div className="text-xs text-muted-foreground font-semibold mb-1">{selectedPackage.name}</div>
+                            )}
+
+                            {customFeatures.length > 0 ? (
+                                <div className="text-xs text-muted-foreground text-left mt-2 border-t pt-1">
+                                    <div className="font-medium mb-1 opacity-80">Paket İçeriği:</div>
+                                    <ul className="list-disc list-inside space-y-0.5">
                                         {customFeatures.map((f, i) => (
                                             <li key={i}>{f}</li>
                                         ))}
                                     </ul>
                                 </div>
                             ) : (
-                                <div className="text-xs text-muted-foreground">Özel / Paketsiz</div>
+                                <div className="text-xs text-muted-foreground">İçerik belirtilmedi</div>
                             )}
                         </div>
                     </div>
+
 
                     {isCalendarConnected && (
                         <div className="flex items-center space-x-2 pt-2 border-t">
@@ -1144,9 +1198,10 @@ Tarih: {{TARIH}}`;
                                 <Calendar className="w-4 h-4" /> Projeyi Google Takvimim'e ekle
                             </Label>
                         </div>
-                    )}
-                </div>
-            </div>
+                    )
+                    }
+                </div >
+            </div >
         );
     };
 
