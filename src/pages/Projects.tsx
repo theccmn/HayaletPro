@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { deleteProject, getProjects, updateProjectStatus } from '../services/apiProjects';
 import type { Project } from '../types';
-import { Plus, LayoutGrid, List as ListIcon, Loader2, Calendar, MoreVertical, Pencil, Trash2, Eye, EyeOff, ArrowUpDown, ArrowUp, ArrowDown, Wallet, Settings2, Kanban as KanbanIcon, CheckCircle2, ZoomIn, ZoomOut, Clock, Search, AlertTriangle, Tag } from 'lucide-react';
+import { Plus, LayoutGrid, List as ListIcon, Loader2, Calendar, MoreVertical, Pencil, Trash2, Eye, EyeOff, ArrowUpDown, ArrowUp, ArrowDown, Wallet, Settings2, Kanban as KanbanIcon, CheckCircle2, ZoomIn, ZoomOut, Clock, Search, AlertTriangle, Tag, Map, MapPin } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { useState } from 'react';
 import { cn } from '../lib/utils';
@@ -14,6 +14,8 @@ import { TypeManagerDialog } from '../components/TypeManagerDialog';
 import { StatusManagerDialog } from '../components/StatusManagerDialog';
 import { SelectionManagerDialog } from '../components/SelectionManagerDialog';
 import { PaymentDetailsDialog } from '../components/PaymentDetailsDialog';
+import { LocationTypeManagerDialog } from '../components/LocationTypeManagerDialog';
+import { LocationManagerDialog } from '../components/LocationManagerDialog';
 import { getTransactions } from '../services/apiFinance';
 import { useNavigate } from 'react-router-dom';
 import {
@@ -92,6 +94,8 @@ export default function Projects() {
     const [isProjectDialogOpen, setIsProjectDialogOpen] = useState(false);
     const [isStatusManagerOpen, setIsStatusManagerOpen] = useState(false);
     const [isTypeManagerOpen, setIsTypeManagerOpen] = useState(false);
+    const [isLocationTypeManagerOpen, setIsLocationTypeManagerOpen] = useState(false);
+    const [isLocationManagerOpen, setIsLocationManagerOpen] = useState(false);
     const [showCompleted, setShowCompleted] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
     const [filterByStatus, setFilterByStatus] = useState<string | null>(null);
@@ -405,6 +409,12 @@ export default function Projects() {
                     <Button variant="outline" size="icon" onClick={() => setIsTypeManagerOpen(true)} title="Türleri Yönet">
                         <Tag className="h-4 w-4" />
                     </Button>
+                    <Button variant="outline" size="icon" onClick={() => setIsLocationTypeManagerOpen(true)} title="Mekan Türlerini Yönet">
+                        <Map className="h-4 w-4" />
+                    </Button>
+                    <Button variant="outline" size="icon" onClick={() => setIsLocationManagerOpen(true)} title="Mekanları Yönet">
+                        <MapPin className="h-4 w-4" />
+                    </Button>
                     <Button onClick={handleCreateClick}>
                         <Plus className="mr-2 h-4 w-4" /> Yeni Proje
                     </Button>
@@ -500,6 +510,27 @@ export default function Projects() {
                             });
                         }
 
+                        // Teslim tarihi kontrolü
+                        const status = statuses?.find(s => s.id === project.status_id);
+                        const isProjectCompleted = status?.label?.toLowerCase() === 'tamamlandı' || status?.label?.toLowerCase() === 'iptal';
+
+                        let isDeliveryOverdue = false;
+                        let isDeliveryApproaching = false;
+
+                        if (project.delivery_date && !isProjectCompleted) {
+                            const deliveryDate = new Date(project.delivery_date);
+                            const today = new Date();
+                            today.setHours(0, 0, 0, 0);
+                            const diffTime = deliveryDate.getTime() - today.getTime();
+                            const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+                            if (diffDays < 0) isDeliveryOverdue = true;
+                            else if (diffDays <= 7) isDeliveryApproaching = true;
+                        }
+
+
+
+
                         return (
                             <div
                                 key={project.id}
@@ -512,9 +543,11 @@ export default function Projects() {
                                     "group relative rounded-xl border bg-card text-card-foreground shadow-sm transition-all hover:shadow-md cursor-pointer",
                                     isOverdue
                                         ? "border-red-300 bg-red-50/50 dark:bg-red-950/20 ring-2 ring-red-400"
-                                        : isPaymentComplete
-                                            ? "border-green-200 bg-green-50/50"
-                                            : "",
+                                        : isDeliveryOverdue
+                                            ? "border-purple-300 bg-purple-50/50 dark:bg-purple-950/20 ring-2 ring-purple-400"
+                                            : isPaymentComplete
+                                                ? "border-green-200 bg-green-50/50"
+                                                : "",
                                     viewMode === 'list' ? "flex items-center p-4 gap-4" : "p-0 overflow-hidden flex flex-col"
                                 )}
                             >
@@ -565,6 +598,18 @@ export default function Projects() {
                                                     <div className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 text-xs font-bold border border-blue-200 animate-in fade-in zoom-in" title="Müşteri seçimini tamamladı">
                                                         <CheckCircle2 className="w-3 h-3" />
                                                         <span className="hidden xl:inline">Seçim Tamam</span>
+                                                    </div>
+                                                )}
+                                                {isDeliveryOverdue && (
+                                                    <div className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-purple-100 text-purple-700 text-xs font-bold border border-purple-200 animate-in fade-in zoom-in animate-pulse" title="Teslim Tarihi Geçti">
+                                                        <AlertTriangle className="w-3 h-3" />
+                                                        <span className="hidden xl:inline">Teslim Gecikti</span>
+                                                    </div>
+                                                )}
+                                                {isDeliveryApproaching && (
+                                                    <div className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-orange-100 text-orange-700 text-xs font-bold border border-orange-200 animate-in fade-in zoom-in" title="Teslim Tarihi Yaklaşıyor">
+                                                        <Clock className="w-3 h-3" />
+                                                        <span className="hidden xl:inline">Teslim Yaklaşıyor</span>
                                                     </div>
                                                 )}
                                                 {/* @ts-ignore */}
@@ -622,6 +667,19 @@ export default function Projects() {
                                                 })()}
                                             </div>
                                         </div>
+
+
+                                        {/* Location Type Strip */}
+                                        {(() => {
+                                            // @ts-ignore
+                                            const locType = Array.isArray(project.location_types) ? project.location_types[0] : project.location_types;
+                                            if (!locType) return null;
+                                            return (
+                                                <div className={cn("w-full px-4 py-1.5 text-[10px] font-bold uppercase tracking-widest text-center border-t", locType.color)}>
+                                                    {locType.label}
+                                                </div>
+                                            );
+                                        })()}
                                     </>
                                 ) : (
                                     <>
@@ -635,6 +693,16 @@ export default function Projects() {
                                             <div className={cn("w-full py-0.5 rounded-full text-[10px] font-bold text-center border shadow-sm", getStatusColor(project.status_id))}>
                                                 {getStatusLabel(project.status_id)}
                                             </div>
+                                            {(() => {
+                                                // @ts-ignore
+                                                const locType = Array.isArray(project.location_types) ? project.location_types[0] : project.location_types;
+                                                if (!locType) return null;
+                                                return (
+                                                    <div className={cn("w-full py-1 rounded-sm text-[9px] font-bold uppercase tracking-widest text-center border shadow-sm", locType.color)}>
+                                                        {locType.label}
+                                                    </div>
+                                                );
+                                            })()}
                                         </div>
 
                                         {/* Title & Client */}
@@ -730,16 +798,28 @@ export default function Projects() {
                 onClose={() => setIsTypeManagerOpen(false)}
             />
 
-            {projectForTransaction && (
-                <TransactionDialog
-                    isOpen={isTransactionDialogOpen}
-                    onClose={() => {
-                        setIsTransactionDialogOpen(false);
-                        setProjectForTransaction(null);
-                    }}
-                    defaultProjectId={projectForTransaction.id}
-                />
-            )}
+            <LocationTypeManagerDialog
+                isOpen={isLocationTypeManagerOpen}
+                onClose={() => setIsLocationTypeManagerOpen(false)}
+            />
+
+            <LocationManagerDialog
+                isOpen={isLocationManagerOpen}
+                onClose={() => setIsLocationManagerOpen(false)}
+            />
+
+            {
+                projectForTransaction && (
+                    <TransactionDialog
+                        isOpen={isTransactionDialogOpen}
+                        onClose={() => {
+                            setIsTransactionDialogOpen(false);
+                            setProjectForTransaction(null);
+                        }}
+                        defaultProjectId={projectForTransaction.id}
+                    />
+                )
+            }
 
             <AlertDialog open={!!projectToDelete} onOpenChange={(open) => !open && setProjectToDelete(null)}>
                 <AlertDialogContent>

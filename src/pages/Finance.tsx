@@ -637,7 +637,7 @@ export default function Finance() {
                                         {transaction.projects?.title || '-'}
                                     </td>
                                     <td className="p-4 align-middle text-muted-foreground">
-                                        {format(new Date(transaction.date), 'd MMM yyyy HH:mm', { locale: tr })}
+                                        {format(parseISO(transaction.date), 'd MMM yyyy HH:mm', { locale: tr })}
                                     </td>
                                     <td className={cn(
                                         "p-4 align-middle text-right font-medium",

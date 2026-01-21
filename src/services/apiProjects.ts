@@ -4,7 +4,7 @@ import type { Project } from '../types';
 export const getProjects = async () => {
     const { data, error } = await supabase
         .from('projects')
-        .select('*, clients!projects_client_id_fkey(phone), photo_selections(status), project_installments(*), project_types(*)')
+        .select('*, clients!projects_client_id_fkey(phone), photo_selections(status), project_installments(*), project_types(*), location_types(*), locations(*)')
         .order('created_at', { ascending: false });
 
     if (error) {
@@ -23,7 +23,7 @@ export const getProjects = async () => {
 export const getProject = async (id: string) => {
     const { data, error } = await supabase
         .from('projects')
-        .select('*, clients(*), photo_selections(*), project_installments(*), project_types(*)')
+        .select('*, clients(*), photo_selections(*), project_installments(*), project_types(*), location_types(*), locations(*)')
         .eq('id', id)
         .single();
 

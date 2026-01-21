@@ -226,7 +226,7 @@ export default function ProjectDetail() {
                                 <span className="font-medium">{project.start_date ? format(new Date(project.start_date), 'd MMMM yyyy', { locale: tr }) : '-'}</span>
                             </div>
                             <div className="flex justify-between py-2 border-b">
-                                <span className="text-muted-foreground">Bitiş/Teslim</span>
+                                <span className="text-muted-foreground">Bitiş</span>
                                 <span className={cn(
                                     "font-medium flex items-center gap-1.5",
                                     !isCompleted ? "text-green-600" : ""
@@ -240,6 +240,41 @@ export default function ProjectDetail() {
                                         "Devam ediyor"
                                     )}
                                 </span>
+                            </div>
+
+                            <div className="flex justify-between py-2 border-b">
+                                <span className="text-muted-foreground">Teslim Tarihi</span>
+                                <span className="font-medium">
+                                    {project.delivery_date ? format(new Date(project.delivery_date), 'd MMMM yyyy', { locale: tr }) : '-'}
+                                </span>
+                            </div>
+
+                            <div className="flex justify-between py-2 border-b">
+                                <span className="text-muted-foreground">Mekan Türü</span>
+                                <span className="font-medium">
+                                    {project.location_types ? (
+                                        <div className="flex items-center gap-2">
+                                            <div
+                                                className="w-2 h-2 rounded-full"
+                                                style={{ backgroundColor: project.location_types.color || '#e5e7eb' }}
+                                            />
+                                            {project.location_types.label}
+                                        </div>
+                                    ) : '-'}
+                                </span>
+                            </div>
+
+                            <div className="flex justify-between py-2 border-b">
+                                <span className="text-muted-foreground">Mekan</span>
+                                <div className="font-medium text-right">
+                                    {project.locations ? (
+                                        <div>{project.locations.name}</div>
+                                    ) : null}
+                                    {project.location_name && (
+                                        <div className="text-xs text-muted-foreground">{project.location_name}</div>
+                                    )}
+                                    {!project.locations && !project.location_name && '-'}
+                                </div>
                             </div>
                         </div>
                         <div className="pt-2">

@@ -12,6 +12,21 @@ export interface ProjectType {
     color: string;
 }
 
+export interface LocationType {
+    id: string;
+    label: string;
+    color: string;
+    order_index: number;
+    created_at?: string;
+}
+
+export interface Location {
+    id: string;
+    name: string;
+    order_index: number;
+    created_at?: string;
+}
+
 export interface Project {
     id: string;
     title: string;
@@ -21,8 +36,14 @@ export interface Project {
     start_date?: string;
     end_date?: string;
     status_id: string;
-    type_id?: string | null; // Added
+    type_id?: string | null;
     project_types?: ProjectType; // Joined data
+    location_type_id?: string | null;
+    location_types?: LocationType; // Joined data
+    location_id?: string | null;
+    locations?: Location; // Joined data
+    location_name?: string;
+    delivery_date?: string;
     details?: string;
     notes?: string;
     price?: number;

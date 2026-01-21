@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { format } from 'date-fns';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
@@ -30,7 +31,7 @@ export function TransactionDialog({ isOpen, onClose, defaultProjectId }: Transac
     const [amount, setAmount] = useState('');
     const [category, setCategory] = useState('');
     const [paymentMethod, setPaymentMethod] = useState('');
-    const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
+    const [date, setDate] = useState(format(new Date(), 'yyyy-MM-dd'));
     const [time, setTime] = useState(new Date().toTimeString().slice(0, 5));
     const [projectId, setProjectId] = useState<string>('none');
 
@@ -138,7 +139,7 @@ export function TransactionDialog({ isOpen, onClose, defaultProjectId }: Transac
             setTitle('');
             setAmount('');
             setType('income');
-            setDate(new Date().toISOString().split('T')[0]);
+            setDate(format(new Date(), 'yyyy-MM-dd'));
             setPaymentMethod(paymentMethods?.[0]?.label || '');
             setProjectId('none');
             setProjectSearch('');
@@ -175,7 +176,7 @@ export function TransactionDialog({ isOpen, onClose, defaultProjectId }: Transac
             type,
             category,
             payment_method: paymentMethod as any,
-            date: `${date}T${time}:00`,
+            date: new Date(`${date}T${time}`).toISOString(),
             project_id: projectId === 'none' ? null : projectId,
             job_date: finalJobDate,
         };

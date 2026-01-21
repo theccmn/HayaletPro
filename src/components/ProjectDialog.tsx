@@ -13,6 +13,8 @@ import { createInstallments } from '../services/apiInstallments';
 import { getSetting } from '../services/apiSettings';
 import { getContractSettings } from '../services/apiContract';
 import { getProjectTypes } from '../services/apiProjectTypes';
+import { getLocationTypes } from '../services/apiLocationTypes';
+import { getLocations } from '../services/apiLocations';
 import { Loader2, Search, Plus, Tag, Check, Package as PackageIcon, ArrowRight, ArrowLeft, X, Printer, Calculator, FileText, Calendar } from 'lucide-react';
 import { cn } from '../lib/utils';
 import type { Project, Client, Package, NewInstallment } from '../types';
@@ -25,6 +27,8 @@ import { toast } from 'sonner';
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors, type DragEndEvent } from '@dnd-kit/core';
 import { arrayMove, SortableContext, sortableKeyboardCoordinates, rectSortingStrategy } from '@dnd-kit/sortable';
 import { SortableTag } from './SortableTag';
+import { LocationTypeManagerDialog } from './LocationTypeManagerDialog';
+import { LocationManagerDialog } from './LocationManagerDialog';
 
 // Combined Schema for final submission check
 const fullSchema = z.object({
@@ -39,6 +43,10 @@ const fullSchema = z.object({
     title: z.string().min(1, "Proje başlığı zorunludur"),
     status_id: z.string().min(1, "Durum seçiniz"),
     type_id: z.string().optional(),
+    location_type_id: z.string().optional(),
+    location_id: z.string().optional(),
+    location_name: z.string().optional(),
+    delivery_date: z.string().optional(),
     start_date: z.string().optional(), // Format: "2026-01-10T10:00|2026-01-10T14:00" veya sadece "2026-01-10T10:00"
     notes: z.string().optional(),
 
@@ -80,8 +88,13 @@ export function ProjectDialog({ isOpen, onClose, projectToEdit }: ProjectDialogP
     const [isReadyToSubmit, setIsReadyToSubmit] = useState(false);
 
     // Google Calendar State
+
     const [addToCalendar, setAddToCalendar] = useState(true);
     const [isCalendarConnected, setIsCalendarConnected] = useState(false);
+
+    // Location Managers State
+    const [isLocationTypeManagerOpen, setIsLocationTypeManagerOpen] = useState(false);
+    const [isLocationManagerOpen, setIsLocationManagerOpen] = useState(false);
 
     useEffect(() => {
         checkConnection().then(setIsCalendarConnected);
@@ -113,6 +126,8 @@ export function ProjectDialog({ isOpen, onClose, projectToEdit }: ProjectDialogP
     const { data: packages } = useQuery({ queryKey: ['packages'], queryFn: getPackages });
     const { data: projects } = useQuery({ queryKey: ['projects'], queryFn: getProjects });
     const { data: projectTypes } = useQuery({ queryKey: ['project_types'], queryFn: getProjectTypes });
+    const { data: locationTypes } = useQuery({ queryKey: ['location_types'], queryFn: getLocationTypes });
+    const { data: locations } = useQuery({ queryKey: ['locations'], queryFn: getLocations });
     const { data: contractSettings } = useQuery({
         queryKey: ['contractSettings'],
         queryFn: getContractSettings,
@@ -235,6 +250,11 @@ export function ProjectDialog({ isOpen, onClose, projectToEdit }: ProjectDialogP
             }
             setValue('start_date', dateValue);
 
+            setValue('location_type_id', projectToEdit.location_type_id || '');
+            setValue('location_id', projectToEdit.location_id || '');
+            setValue('location_name', projectToEdit.location_name || '');
+            setValue('delivery_date', projectToEdit.delivery_date || '');
+
             setValue('notes', projectToEdit.notes || '');
             setValue('custom_price', projectToEdit.price || 0);
             if (projectToEdit.client_name) {
@@ -278,8 +298,13 @@ export function ProjectDialog({ isOpen, onClose, projectToEdit }: ProjectDialogP
                 start_date: startDate ? (startDate.includes('T') ? new Date(startDate).toISOString() : new Date(`${startDate}T09:00:00`).toISOString()) : undefined,
                 end_date: endDate ? new Date(endDate).toISOString() : undefined,
                 notes: data.notes || undefined,
-                type_id: data.type_id || null,
+                type_id: data.type_id || undefined,
+                location_type_id: data.location_type_id || undefined,
+                location_id: data.location_id || undefined,
+                location_name: data.location_name || undefined,
+                delivery_date: data.delivery_date || undefined,
                 price: data.custom_price || 0,
+
                 details: selectedPackage
                     ? `Paket: ${selectedPackage.name}${customFeatures.length > 0 ? ` | Özellikler: ${customFeatures.join(', ')}` : ''}`
                     : customFeatures.length > 0
@@ -852,10 +877,63 @@ Tarih: {{TARIH}}`;
                         {projectTypes?.map(t => <option key={t.id} value={t.id}>{t.label}</option>)}
                     </select>
                 </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4 mt-4 animate-in slide-in-from-right-4 fade-in duration-500 delay-100">
                 <div className="grid gap-2">
-                    <Label>Notlar</Label>
-                    <Input {...register('notes')} placeholder="Detaylar..." />
+                    <div className="flex items-center justify-between">
+                        <Label>Mekan Türü</Label>
+                        <button
+                            type="button"
+                            className="text-xs text-primary hover:underline hover:text-primary/80"
+                            onClick={() => setIsLocationTypeManagerOpen(true)}
+                        >
+                            Yönet
+                        </button>
+                    </div>
+                    <select
+                        className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                        {...register('location_type_id')}
+                    >
+                        <option value="">Seçiniz (Opsiyonel)</option>
+                        {locationTypes?.map(t => <option key={t.id} value={t.id}>{t.label}</option>)}
+                    </select>
                 </div>
+                <div className="grid gap-2">
+                    <div className="flex items-center justify-between">
+                        <Label>Mekan</Label>
+                        <button
+                            type="button"
+                            className="text-xs text-primary hover:underline hover:text-primary/80"
+                            onClick={() => setIsLocationManagerOpen(true)}
+                        >
+                            Yönet
+                        </button>
+                    </div>
+                    <select
+                        className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                        {...register('location_id')}
+                    >
+                        <option value="">Seçiniz (Opsiyonel)</option>
+                        {locations?.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
+                    </select>
+                </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4 mt-4 animate-in slide-in-from-right-4 fade-in duration-500 delay-200">
+                <div className="grid gap-2">
+                    <Label>Mekan Detayı (Opsiyonel)</Label>
+                    <Input {...register('location_name')} placeholder="Örn. Salon 2, Giriş Kat" />
+                </div>
+                <div className="grid gap-2">
+                    <Label>Teslim Tarihi</Label>
+                    <Input type="date" {...register('delivery_date')} className="w-full" />
+                </div>
+            </div>
+
+            <div className="grid gap-2 mt-4 animate-in slide-in-from-right-4 fade-in duration-500 delay-300">
+                <Label>Notlar</Label>
+                <Input {...register('notes')} placeholder="Detaylar..." />
             </div>
             <DateTimePicker
                 value={watch('start_date')}
@@ -1207,143 +1285,234 @@ Tarih: {{TARIH}}`;
 
     if (isEditMode) {
         return (
-            <Dialog
-                isOpen={isOpen}
-                onClose={onClose}
-                title="Projeyi Düzenle"
-                description="Proje detaylarını buradan güncelleyebilirsiniz."
-                className="max-w-4xl"
-            >
-                <div className="max-h-[85vh] overflow-y-auto px-1 -mx-1">
-                    <form onSubmit={handleSubmit(onSubmit)} className="mt-6 flex flex-col gap-5 pb-4">
+            <>
+                <Dialog
+                    isOpen={isOpen}
+                    onClose={onClose}
+                    title="Projeyi Düzenle"
+                    description="Proje detaylarını buradan güncelleyebilirsiniz."
+                    className="max-w-4xl"
+                >
+                    <div className="max-h-[85vh] overflow-y-auto px-1 -mx-1">
+                        <form onSubmit={handleSubmit(onSubmit)} className="mt-6 flex flex-col gap-5 pb-4">
 
-                        {/* Temel Bilgiler Grubu */}
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div className="space-y-1.5">
-                                <Label className="text-xs text-muted-foreground uppercase tracking-wider font-bold">Proje Başlığı</Label>
-                                <Input {...register('title')} className="h-10 font-medium" />
-                            </div>
+                            {/* Temel Bilgiler Grubu */}
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div className="space-y-1.5">
+                                    <Label className="text-xs text-muted-foreground uppercase tracking-wider font-bold">Proje Başlığı</Label>
+                                    <Input {...register('title')} className="h-10 font-medium" />
+                                </div>
 
-                            <div className="space-y-1.5">
-                                <Label className="text-xs text-muted-foreground uppercase tracking-wider font-bold">Müşteri</Label>
-                                <div className="flex h-10 w-full items-center rounded-md border border-input bg-muted px-3 py-2 text-sm text-muted-foreground cursor-not-allowed">
-                                    {projectToEdit.client_name || 'İsimsiz Müşteri'}
+                                <div className="space-y-1.5">
+                                    <Label className="text-xs text-muted-foreground uppercase tracking-wider font-bold">Müşteri</Label>
+                                    <div className="flex h-10 w-full items-center rounded-md border border-input bg-muted px-3 py-2 text-sm text-muted-foreground cursor-not-allowed">
+                                        {projectToEdit.client_name || 'İsimsiz Müşteri'}
+                                    </div>
                                 </div>
                             </div>
-                        </div>
 
-                        <div className="h-px bg-border/50" />
+                            <div className="h-px bg-border/50" />
 
-                        {/* Durum ve Finans */}
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            {/* Durum, Tür ve Fiyat */}
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                <div className="space-y-1.5">
+                                    <Label className="text-xs text-muted-foreground uppercase tracking-wider font-bold">Durum</Label>
+                                    <select
+                                        {...register('status_id')}
+                                        className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                                    >
+                                        {statuses?.map(s => <option key={s.id} value={s.id}>{s.label}</option>)}
+                                    </select>
+                                </div>
+                                <div className="space-y-1.5">
+                                    <Label className="text-xs text-muted-foreground uppercase tracking-wider font-bold">Proje Türü</Label>
+                                    <select
+                                        {...register('type_id')}
+                                        className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                                    >
+                                        <option value="">Seçiniz (Opsiyonel)</option>
+                                        {projectTypes?.map(t => <option key={t.id} value={t.id}>{t.label}</option>)}
+                                    </select>
+                                </div>
+                                <div className="space-y-1.5">
+                                    <Label className="text-xs text-muted-foreground uppercase tracking-wider font-bold">Fiyat (₺)</Label>
+                                    <Input type="number" {...register('custom_price', { valueAsNumber: true })} className="h-10" />
+                                </div>
+                            </div>
+
+                            {/* Mekan Bilgileri */}
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div className="space-y-1.5">
+                                    <div className="flex justify-between items-center">
+                                        <Label className="text-xs text-muted-foreground uppercase tracking-wider font-bold">Mekan Türü</Label>
+                                        <button
+                                            type="button"
+                                            onClick={() => setIsLocationTypeManagerOpen(true)}
+                                            className="text-xs text-blue-600 hover:text-blue-800 font-medium"
+                                        >
+                                            Yönet
+                                        </button>
+                                    </div>
+                                    <select
+                                        {...register('location_type_id')}
+                                        className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                                    >
+                                        <option value="">Seçiniz (Opsiyonel)</option>
+                                        {locationTypes?.map(t => <option key={t.id} value={t.id}>{t.label}</option>)}
+                                    </select>
+                                </div>
+
+                                <div className="space-y-1.5">
+                                    <div className="flex justify-between items-center">
+                                        <Label className="text-xs text-muted-foreground uppercase tracking-wider font-bold">Mekan</Label>
+                                        <button
+                                            type="button"
+                                            onClick={() => setIsLocationManagerOpen(true)}
+                                            className="text-xs text-blue-600 hover:text-blue-800 font-medium"
+                                        >
+                                            Yönet
+                                        </button>
+                                    </div>
+                                    <select
+                                        {...register('location_id')}
+                                        className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                                    >
+                                        <option value="">Seçiniz (Opsiyonel)</option>
+                                        {locations?.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
+                                    </select>
+                                </div>
+                            </div>
+
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div className="space-y-1.5">
+                                    <Label className="text-xs text-muted-foreground uppercase tracking-wider font-bold">Mekan Detayı</Label>
+                                    <Input {...register('location_name')} className="h-10" placeholder="Örn. Salon 2, Giriş Kat" />
+                                </div>
+
+                                <div className="space-y-1.5">
+                                    <Label className="text-xs text-muted-foreground uppercase tracking-wider font-bold">Teslim Tarihi</Label>
+                                    <Input type="date" {...register('delivery_date')} className="h-10" />
+                                </div>
+                            </div>
+
+                            <div className="h-px bg-border/50" />
+
+                            {/* Zamanlama */}
                             <div className="space-y-1.5">
-                                <Label className="text-xs text-muted-foreground uppercase tracking-wider font-bold">Durum</Label>
-                                <select
-                                    {...register('status_id')}
-                                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                                >
-                                    {statuses?.map(s => <option key={s.id} value={s.id}>{s.label}</option>)}
-                                </select>
+                                <Label className="text-xs text-muted-foreground uppercase tracking-wider font-bold">Tarih ve Saat Aralığı</Label>
+                                <div className="border rounded-md p-1 bg-card">
+                                    <DateTimePicker
+                                        value={watch('start_date')}
+                                        onChange={(value) => setValue('start_date', value)}
+                                    />
+                                </div>
                             </div>
+
+
                             <div className="space-y-1.5">
-                                <Label className="text-xs text-muted-foreground uppercase tracking-wider font-bold">Fiyat (₺)</Label>
-                                <Input type="number" {...register('custom_price', { valueAsNumber: true })} className="h-10" />
+                                <Label className="text-xs text-muted-foreground uppercase tracking-wider font-bold">Notlar</Label>
+                                <Input {...register('notes')} className="h-10" placeholder="Proje ile ilgili notlar..." />
                             </div>
-                        </div>
 
-                        {/* Zamanlama */}
-                        <div className="space-y-1.5">
-                            <Label className="text-xs text-muted-foreground uppercase tracking-wider font-bold">Tarih ve Saat Aralığı</Label>
-                            <div className="border rounded-md p-1 bg-card">
-                                <DateTimePicker
-                                    value={watch('start_date')}
-                                    onChange={(value) => setValue('start_date', value)}
-                                />
+                            <div className="flex justify-end gap-3 mt-2 pt-4 border-t">
+                                <Button type="button" variant="outline" onClick={onClose} className="h-10 px-6">İptal</Button>
+                                <Button type="submit" disabled={mutation.isPending} className="h-10 px-6 bg-green-600 hover:bg-green-700">
+                                    {mutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                                    Değişiklikleri Kaydet
+                                </Button>
                             </div>
-                        </div>
+                        </form>
+                    </div>
+                </Dialog>
 
-
-                        <div className="space-y-1.5">
-                            <Label className="text-xs text-muted-foreground uppercase tracking-wider font-bold">Notlar</Label>
-                            <Input {...register('notes')} className="h-10" placeholder="Proje ile ilgili notlar..." />
-                        </div>
-
-                        <div className="flex justify-end gap-3 mt-2 pt-4 border-t">
-                            <Button type="button" variant="outline" onClick={onClose} className="h-10 px-6">İptal</Button>
-                            <Button type="submit" disabled={mutation.isPending} className="h-10 px-6 bg-green-600 hover:bg-green-700">
-                                {mutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                                Değişiklikleri Kaydet
-                            </Button>
-                        </div>
-                    </form>
-                </div>
-            </Dialog>
+                <LocationTypeManagerDialog
+                    isOpen={isLocationTypeManagerOpen}
+                    onClose={() => setIsLocationTypeManagerOpen(false)}
+                />
+                <LocationManagerDialog
+                    isOpen={isLocationManagerOpen}
+                    onClose={() => setIsLocationManagerOpen(false)}
+                />
+            </>
         );
     }
 
     return (
-        <Dialog
-            isOpen={isOpen}
-            onClose={onClose}
-            title={`Yeni Proje - Adım ${step}/7`
-            }
-            description={
-                step === 1 ? "Müşteri seçin veya yeni oluşturun." :
-                    step === 2 ? "Yeni müşteri detaylarını girin." :
-                        step === 3 ? "Proje detaylarını girin." :
-                            step === 4 ? "Bir paket seçin veya fiyat belirleyin." :
-                                step === 5 ? "Ödeme planını oluşturun." :
-                                    step === 6 ? "Sözleşmeyi inceleyin ve yazdırın." :
-                                        "Bilgileri kontrol edip onaylayın."
-            }
-            className="max-w-4xl"
-        >
-            <div className="mt-4">
-                {/* Steps Indicator */}
-                <div className="flex gap-1 mb-6">
-                    {[1, 2, 3, 4, 5, 6, 7].map(s => (
-                        <div key={s} className={cn("h-1 flex-1 rounded-full transition-all", s <= step ? "bg-primary" : "bg-muted")} />
-                    ))}
-                </div>
+        <>
 
-                <form onSubmit={handleSubmit(onSubmit)}>
-                    {step === 1 && renderStep1_ClientSelect()}
-                    {step === 2 && renderStep2_NewClient()}
-                    {step === 3 && renderStep3_ProjectInfo()}
-                    {step === 4 && renderStep4_Packages()}
-                    {step === 5 && renderStep5_PaymentPlan()}
-                    {step === 6 && renderStep6_Contract()}
-                    {step === 7 && renderStep7_Summary()}
+            <Dialog
 
-                    <div className="flex justify-between mt-6 pt-4 border-t">
-                        {step > 1 ? (
-                            <Button type="button" variant="outline" onClick={prevStep}>
-                                <ArrowLeft className="mr-2 h-4 w-4" /> Geri
-                            </Button>
-                        ) : (
-                            <Button type="button" variant="ghost" onClick={onClose}>İptal</Button>
-                        )}
-
-                        {step < 7 ? (
-                            <Button type="button" onClick={nextStep} disabled={step === 1 && !selectedClient && !isNewClientMode}>
-                                İleri <ArrowRight className="ml-2 h-4 w-4" />
-                            </Button>
-                        ) : (
-                            <Button
-                                type="submit"
-                                disabled={mutation.isPending || !isReadyToSubmit}
-                                className={cn(
-                                    "transition-all",
-                                    isReadyToSubmit ? "bg-green-600 hover:bg-green-700" : "bg-muted text-muted-foreground"
-                                )}
-                            >
-                                {mutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                                {!isReadyToSubmit ? "Lütfen bekleyin..." : "Onayla ve Oluştur"}
-                            </Button>
-                        )}
+                isOpen={isOpen}
+                onClose={onClose}
+                title={`Yeni Proje - Adım ${step}/7`
+                }
+                description={
+                    step === 1 ? "Müşteri seçin veya yeni oluşturun." :
+                        step === 2 ? "Yeni müşteri detaylarını girin." :
+                            step === 3 ? "Proje detaylarını girin." :
+                                step === 4 ? "Bir paket seçin veya fiyat belirleyin." :
+                                    step === 5 ? "Ödeme planını oluşturun." :
+                                        step === 6 ? "Sözleşmeyi inceleyin ve yazdırın." :
+                                            "Bilgileri kontrol edip onaylayın."
+                }
+                className="max-w-4xl"
+            >
+                <div className="mt-4">
+                    {/* Steps Indicator */}
+                    <div className="flex gap-1 mb-6">
+                        {[1, 2, 3, 4, 5, 6, 7].map(s => (
+                            <div key={s} className={cn("h-1 flex-1 rounded-full transition-all", s <= step ? "bg-primary" : "bg-muted")} />
+                        ))}
                     </div>
-                </form>
-            </div>
-        </Dialog >
+
+                    <form onSubmit={handleSubmit(onSubmit)}>
+                        {step === 1 && renderStep1_ClientSelect()}
+                        {step === 2 && renderStep2_NewClient()}
+                        {step === 3 && renderStep3_ProjectInfo()}
+                        {step === 4 && renderStep4_Packages()}
+                        {step === 5 && renderStep5_PaymentPlan()}
+                        {step === 6 && renderStep6_Contract()}
+                        {step === 7 && renderStep7_Summary()}
+
+                        <div className="flex justify-between mt-6 pt-4 border-t">
+                            {step > 1 ? (
+                                <Button type="button" variant="outline" onClick={prevStep}>
+                                    <ArrowLeft className="mr-2 h-4 w-4" /> Geri
+                                </Button>
+                            ) : (
+                                <Button type="button" variant="ghost" onClick={onClose}>İptal</Button>
+                            )}
+
+                            {step < 7 ? (
+                                <Button type="button" onClick={nextStep} disabled={step === 1 && !selectedClient && !isNewClientMode}>
+                                    İleri <ArrowRight className="ml-2 h-4 w-4" />
+                                </Button>
+                            ) : (
+                                <Button
+                                    type="submit"
+                                    disabled={mutation.isPending || !isReadyToSubmit}
+                                    className={cn(
+                                        "transition-all",
+                                        isReadyToSubmit ? "bg-green-600 hover:bg-green-700" : "bg-muted text-muted-foreground"
+                                    )}
+                                >
+                                    {mutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                                    {!isReadyToSubmit ? "Lütfen bekleyin..." : "Onayla ve Oluştur"}
+                                </Button>
+                            )}
+                        </div>
+                    </form>
+                </div>
+            </Dialog >
+
+            <LocationTypeManagerDialog
+                isOpen={isLocationTypeManagerOpen}
+                onClose={() => setIsLocationTypeManagerOpen(false)}
+            />
+            <LocationManagerDialog
+                isOpen={isLocationManagerOpen}
+                onClose={() => setIsLocationManagerOpen(false)}
+            />
+        </>
     );
 }
