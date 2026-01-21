@@ -23,7 +23,8 @@ import {
     ArrowUpDown,
     Trash2,
     EyeOff,
-    AlertTriangle
+    AlertTriangle,
+    MessageCircle
 } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { useState } from 'react';
@@ -330,6 +331,17 @@ export default function ClientDetail() {
                                 </a>
                             </Button>
                         )}
+                        {client.phone && (
+                            <Button variant="outline" size="sm" className="flex-1 text-green-600 hover:text-green-700 hover:bg-green-50" asChild>
+                                <a
+                                    href={`https://wa.me/${client.phone.replace(/\D/g, '').replace(/^0/, '90')}`}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                >
+                                    <MessageCircle className="mr-2 h-3 w-3" /> WhatsApp
+                                </a>
+                            </Button>
+                        )}
                         {client.email && (
                             <Button variant="outline" size="sm" className="flex-1" asChild>
                                 <a href={`mailto:${client.email}`}>
@@ -409,10 +421,10 @@ export default function ClientDetail() {
                                     <div
                                         key={project.id}
                                         className={`rounded-lg border p-4 hover:bg-muted/50 transition-colors ${isOverdue
-                                                ? 'ring-2 ring-red-400 border-red-300 bg-red-50/50 dark:bg-red-950/20'
-                                                : isPaymentComplete
-                                                    ? 'ring-2 ring-green-500 bg-green-50/50 dark:bg-green-950/20'
-                                                    : ''
+                                            ? 'ring-2 ring-red-400 border-red-300 bg-red-50/50 dark:bg-red-950/20'
+                                            : isPaymentComplete
+                                                ? 'ring-2 ring-green-500 bg-green-50/50 dark:bg-green-950/20'
+                                                : ''
                                             }`}
                                     >
                                         <div className="flex items-start justify-between gap-4">

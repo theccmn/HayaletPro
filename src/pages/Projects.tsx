@@ -94,6 +94,7 @@ export default function Projects() {
     const [isTypeManagerOpen, setIsTypeManagerOpen] = useState(false);
     const [showCompleted, setShowCompleted] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
+    const [filterByStatus, setFilterByStatus] = useState<string | null>(null);
 
     // State for Dialogs
     const [projectToEdit, setProjectToEdit] = useState<Project | null>(null);
@@ -230,10 +231,15 @@ export default function Projects() {
     };
 
     const filteredProjects = projects?.filter(p => {
-        // Filter by completion status
-        if (!showCompleted) {
-            const status = statuses?.find(s => s.id === p.status_id);
-            if (status?.label?.toLowerCase() === 'tamamlandı') return false;
+        // Filter by specific status
+        if (filterByStatus) {
+            if (p.status_id !== filterByStatus) return false;
+        } else {
+            // Filter by completion status (only when no specific filter)
+            if (!showCompleted) {
+                const status = statuses?.find(s => s.id === p.status_id);
+                if (status?.label?.toLowerCase() === 'tamamlandı') return false;
+            }
         }
 
         // Filter by search query
@@ -404,6 +410,37 @@ export default function Projects() {
                     </Button>
                 </div>
             </div>
+
+            {/* Status İstatistik Kartları - Sadece grid ve list görünümlerinde */}
+            {viewMode !== 'kanban' && statuses && statuses.length > 0 && (
+                <div className="grid gap-2" style={{ gridTemplateColumns: `repeat(${statuses.length}, 1fr)` }}>
+                    {statuses.map(status => {
+                        const count = projects?.filter(p => p.status_id === status.id).length || 0;
+                        const isSelected = filterByStatus === status.id;
+
+                        return (
+                            <div
+                                key={status.id}
+                                onClick={() => setFilterByStatus(isSelected ? null : status.id)}
+                                className={cn(
+                                    "flex items-center gap-3 p-3 rounded-lg border shadow-sm transition-all hover:shadow-md cursor-pointer",
+                                    status.color || 'bg-gray-100 text-gray-700',
+                                    isSelected && "ring-2 ring-offset-2 ring-primary scale-[1.02]"
+                                )}
+                            >
+                                <div className="flex items-center justify-center w-8 h-8 rounded-full bg-white/50">
+                                    <span className="text-xl font-bold">
+                                        {count}
+                                    </span>
+                                </div>
+                                <span className="text-sm font-semibold">
+                                    {status.label}
+                                </span>
+                            </div>
+                        );
+                    })}
+                </div>
+            )}
 
             {projects?.length === 0 ? (
                 <div className="flex flex-col items-center justify-center rounded-lg border border-dashed p-8 text-center animate-in fade-in-50">
