@@ -13,6 +13,7 @@ import MainLayout from './layouts/MainLayout';
 import { Toaster } from 'sonner';
 import { GoogleAuthProviderWrapper } from './components/GoogleAuthProviderWrapper';
 import { AuthProvider } from './contexts/AuthContext';
+import { AppSettingsProvider } from './context/AppSettingsContext';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import ProjectDetail from './pages/ProjectDetail';
 
@@ -20,33 +21,35 @@ function App() {
   return (
     <BrowserRouter>
       <AuthProvider>
-        <GoogleAuthProviderWrapper>
-          <Toaster richColors position="top-center" />
-          <Routes>
-            {/* Public Routes */}
-            <Route path="/login" element={<Login />} />
-            <Route path="/select/:token" element={<ClientSelectionView />} />
+        <AppSettingsProvider>
+          <GoogleAuthProviderWrapper>
+            <Toaster richColors position="top-center" />
+            <Routes>
+              {/* Public Routes */}
+              <Route path="/login" element={<Login />} />
+              <Route path="/select/:token" element={<ClientSelectionView />} />
 
-            {/* Protected Routes */}
-            <Route path="/" element={
-              <ProtectedRoute>
-                <MainLayout />
-              </ProtectedRoute>
-            }>
-              <Route index element={<Navigate to="/dashboard" replace />} />
-              <Route path="dashboard" element={<Dashboard />} />
-              <Route path="projects" element={<Projects />} />
-              <Route path="projects/:id" element={<ProjectDetail />} />
-              <Route path="calendar" element={<Calendar />} />
-              <Route path="finance" element={<Finance />} />
-              <Route path="clients" element={<Clients />} />
-              <Route path="clients/:id" element={<ClientDetail />} />
-              <Route path="inventory" element={<Inventory />} />
-              <Route path="settings" element={<Settings />} />
-              <Route path="*" element={<div className="p-4">Sayfa bulunamadı</div>} />
-            </Route>
-          </Routes>
-        </GoogleAuthProviderWrapper>
+              {/* Protected Routes */}
+              <Route path="/" element={
+                <ProtectedRoute>
+                  <MainLayout />
+                </ProtectedRoute>
+              }>
+                <Route index element={<Navigate to="/dashboard" replace />} />
+                <Route path="dashboard" element={<Dashboard />} />
+                <Route path="projects" element={<Projects />} />
+                <Route path="projects/:id" element={<ProjectDetail />} />
+                <Route path="calendar" element={<Calendar />} />
+                <Route path="finance" element={<Finance />} />
+                <Route path="clients" element={<Clients />} />
+                <Route path="clients/:id" element={<ClientDetail />} />
+                <Route path="inventory" element={<Inventory />} />
+                <Route path="settings" element={<Settings />} />
+                <Route path="*" element={<div className="p-4">Sayfa bulunamadı</div>} />
+              </Route>
+            </Routes>
+          </GoogleAuthProviderWrapper>
+        </AppSettingsProvider>
       </AuthProvider>
     </BrowserRouter>
   );
