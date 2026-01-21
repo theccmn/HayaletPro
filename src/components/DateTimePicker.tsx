@@ -18,7 +18,7 @@ interface DateTimePickerProps {
 
 // Çalışma saatleri
 const WORK_START_HOUR = 8;
-const WORK_END_HOUR = 20;
+const WORK_END_HOUR = 24; // Gece 00:00
 
 // Saat slotlarını oluştur
 const generateTimeSlots = () => {
@@ -417,47 +417,110 @@ export function DateTimePicker({ value, onChange }: DateTimePickerProps) {
                 </div>
             </div>
 
-            {/* Alt Panel - Haftalık Özet */}
+            {/* Alt Panel - Haftalık Saat Bazlı Takvim */}
             {selectedDate && (
                 <div className="border-t p-4 bg-muted/20">
-                    <p className="text-xs font-medium text-muted-foreground mb-2">
-                        Haftaya genel bakış • {format(startOfWeek(selectedDate, { weekStartsOn: 1 }), 'd MMM', { locale: tr })} - {format(endOfWeek(selectedDate, { weekStartsOn: 1 }), 'd MMM', { locale: tr })}
-                    </p>
-                    <div className="flex gap-1">
-                        {eachDayOfInterval({
-                            start: startOfWeek(selectedDate, { weekStartsOn: 1 }),
-                            end: endOfWeek(selectedDate, { weekStartsOn: 1 })
-                        }).map(day => {
-                            const busyRanges = getBusyTimesForDate(day);
-                            const isSelectedDay = selectedDate && isSameDay(day, selectedDate);
-                            const totalBusyHours = busyRanges.reduce((acc, range) => {
-                                return acc + (timeToMinutes(range.endTime) - timeToMinutes(range.startTime)) / 60;
-                            }, 0);
+                    <div className="flex items-center justify-between mb-3">
+                        <p className="text-xs font-semibold text-muted-foreground">
+                            Haftaya genel bakış
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                            {format(startOfWeek(selectedDate, { weekStartsOn: 1 }), 'd MMM', { locale: tr })} - {format(endOfWeek(selectedDate, { weekStartsOn: 1 }), 'd MMM', { locale: tr })}
+                        </p>
+                    </div>
 
-                            return (
-                                <button
-                                    key={day.toString()}
-                                    type="button"
-                                    onClick={() => handleDayClick(day)}
-                                    className={cn(
-                                        "flex-1 py-2 rounded text-center text-xs font-medium transition-all",
-                                        isSelectedDay ? "bg-primary text-primary-foreground" : "bg-card border hover:bg-muted/50",
-                                        totalBusyHours > 0 && !isSelectedDay && "border-red-200 bg-red-50"
-                                    )}
-                                >
-                                    <div>{format(day, 'EEE', { locale: tr })}</div>
-                                    <div className="font-bold">{format(day, 'd')}</div>
-                                    {totalBusyHours > 0 && (
-                                        <div className={cn(
-                                            "text-[10px]",
-                                            isSelectedDay ? "text-primary-foreground/80" : "text-red-600"
-                                        )}>
-                                            {totalBusyHours}s dolu
+                    {/* Grid Takvim */}
+                    <div className="overflow-x-auto">
+                        <div className="min-w-[600px]">
+                            {/* Header - Günler */}
+                            <div className="grid grid-cols-[50px_repeat(7,1fr)] gap-px bg-border rounded-t-lg overflow-hidden">
+                                <div className="bg-muted/50 p-2 text-xs font-medium text-muted-foreground text-center">
+                                    SAAT
+                                </div>
+                                {eachDayOfInterval({
+                                    start: startOfWeek(selectedDate, { weekStartsOn: 1 }),
+                                    end: endOfWeek(selectedDate, { weekStartsOn: 1 })
+                                }).map(day => {
+                                    const isSelectedDay = selectedDate && isSameDay(day, selectedDate);
+                                    const isToday = isSameDay(day, new Date());
+                                    return (
+                                        <button
+                                            key={day.toString()}
+                                            type="button"
+                                            onClick={() => handleDayClick(day)}
+                                            className={cn(
+                                                "p-2 text-center transition-all border-r border-border/50 last:border-r-0",
+                                                isSelectedDay ? "bg-primary text-primary-foreground" : "bg-muted/50 hover:bg-muted",
+                                                isToday && !isSelectedDay && "ring-1 ring-primary ring-inset"
+                                            )}
+                                        >
+                                            <div className="text-[10px] font-medium uppercase">{format(day, 'EEE', { locale: tr })}</div>
+                                            <div className="text-xs font-bold">{format(day, 'd/MM')}</div>
+                                        </button>
+                                    );
+                                })}
+                            </div>
+
+                            {/* Body - Saat Satırları */}
+                            <div className="relative bg-card border border-t-0 rounded-b-lg overflow-hidden">
+                                {/* Saat satırları - 08:00 - 00:00 */}
+                                {[8, 10, 12, 14, 16, 18, 20, 22].map(hour => (
+                                    <div key={hour} className="grid grid-cols-[50px_repeat(7,1fr)] gap-px border-b last:border-b-0">
+                                        <div className="bg-muted/30 p-1 text-[10px] text-muted-foreground text-center flex items-center justify-center">
+                                            {hour.toString().padStart(2, '0')}:00
                                         </div>
-                                    )}
-                                </button>
-                            );
-                        })}
+                                        {eachDayOfInterval({
+                                            start: startOfWeek(selectedDate, { weekStartsOn: 1 }),
+                                            end: endOfWeek(selectedDate, { weekStartsOn: 1 })
+                                        }).map(day => {
+                                            const dayBusySlots = getBusyTimesForDate(day);
+                                            const isSelectedDay = selectedDate && isSameDay(day, selectedDate);
+
+                                            // Bu saat diliminde (hour - hour+2) olan randevuları bul
+                                            const slotsInHour = dayBusySlots.filter(slot => {
+                                                const slotStartHour = parseInt(slot.startTime.split(':')[0]);
+                                                return slotStartHour >= hour && slotStartHour < hour + 2;
+                                            });
+
+                                            return (
+                                                <div
+                                                    key={`${day.toString()}-${hour}`}
+                                                    onClick={() => handleDayClick(day)}
+                                                    className={cn(
+                                                        "min-h-[40px] p-0.5 relative cursor-pointer transition-all hover:bg-muted/30 border-r border-border/50 last:border-r-0",
+                                                        isSelectedDay && "bg-primary/5"
+                                                    )}
+                                                >
+                                                    {slotsInHour.map((slot, idx) => {
+                                                        // Randevu bloğunu render et
+                                                        const project = projects?.find(p => {
+                                                            if (!p.start_date) return false;
+                                                            const pDate = format(parseISO(p.start_date), 'yyyy-MM-dd');
+                                                            const dayDate = format(day, 'yyyy-MM-dd');
+                                                            const pTime = format(parseISO(p.start_date), 'HH:mm');
+                                                            return pDate === dayDate && pTime === slot.startTime;
+                                                        });
+
+                                                        return (
+                                                            <div
+                                                                key={idx}
+                                                                className="bg-teal-100 border-l-2 border-teal-500 rounded-r px-1 py-0.5 text-[9px] text-teal-800 truncate mb-0.5"
+                                                                title={`${slot.startTime} - ${slot.endTime}${project?.client_name ? ` | ${project.client_name}` : ''}`}
+                                                            >
+                                                                <span className="font-medium">{slot.startTime}</span>
+                                                                {project?.client_name && (
+                                                                    <span className="block truncate">{project.client_name}</span>
+                                                                )}
+                                                            </div>
+                                                        );
+                                                    })}
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
                     </div>
                 </div>
             )}
