@@ -13,6 +13,7 @@ import { Label } from '../components/ui/label';
 import { Plus, Edit, Trash2, Package as PackageIcon, Settings as SettingsIcon, Database, Save, CheckCircle, FileText } from 'lucide-react';
 import type { Package } from '../types';
 import { cn } from '../lib/utils';
+import { toast } from 'sonner';
 
 export default function Settings() {
     const [activeTab, setActiveTab] = useState<'packages' | 'integrations' | 'contract'>('packages');
@@ -39,13 +40,18 @@ export default function Settings() {
     }, []);
 
     const handleSaveKey = async () => {
+        if (!driveApiKey.trim()) {
+            toast.error('Lütfen geçerli bir API anahtarı girin.');
+            return;
+        }
         try {
             await updateSetting('google_drive_api_key', driveApiKey);
+            toast.success('Google Drive API anahtarı başarıyla kaydedildi.');
             setShowSavedKey(true);
             setTimeout(() => setShowSavedKey(false), 2000);
         } catch (error) {
             console.error('Failed to save API key:', error);
-            alert('Ayarlar kaydedilirken bir hata oluştu.');
+            toast.error('Ayarlar kaydedilirken bir hata oluştu.');
         }
     };
 

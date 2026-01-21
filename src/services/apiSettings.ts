@@ -9,7 +9,7 @@ export interface AppSetting {
 
 export const getSetting = async (key: string): Promise<string | null> => {
   const { data, error } = await supabase
-    .from('app_settings')
+    .from('settings')
     .select('value')
     .eq('key', key)
     .single();
@@ -27,7 +27,7 @@ export const getSetting = async (key: string): Promise<string | null> => {
 
 export const updateSetting = async (key: string, value: string): Promise<void> => {
   const { error } = await supabase
-    .from('app_settings')
+    .from('settings')
     .upsert({ key, value, updated_at: new Date().toISOString() });
 
   if (error) {

@@ -19,7 +19,7 @@ interface EmailRequest {
 // Helper to fetch settings from DB
 const getAppSetting = async (supabase: any, key: string) => {
     const { data, error } = await supabase
-        .from('app_settings')
+        .from('settings')
         .select('value')
         .eq('key', key)
         .single();
