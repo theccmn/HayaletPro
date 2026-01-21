@@ -505,11 +505,11 @@ export function DateTimePicker({ value, onChange }: DateTimePickerProps) {
                                                             <div
                                                                 key={idx}
                                                                 className="bg-teal-100 border-l-2 border-teal-500 rounded-r px-1 py-0.5 text-[9px] text-teal-800 truncate mb-0.5"
-                                                                title={`${slot.startTime} - ${slot.endTime}${project?.client_name ? ` | ${project.client_name}` : ''}`}
+                                                                title={`${slot.startTime} - ${slot.endTime}${project?.title ? ` | ${project.title}` : ''}`}
                                                             >
                                                                 <span className="font-medium">{slot.startTime}</span>
-                                                                {project?.client_name && (
-                                                                    <span className="block truncate">{project.client_name}</span>
+                                                                {project?.title && (
+                                                                    <span className="block truncate">{project.title}</span>
                                                                 )}
                                                             </div>
                                                         );
