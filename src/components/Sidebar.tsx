@@ -15,7 +15,12 @@ import {
 import { cn } from '../lib/utils';
 import { Button } from './ui/button';
 
+import { useAuth } from '../hooks/useAuth';
+import { toast } from 'sonner';
+
 const Sidebar = () => {
+    const { user, signOut } = useAuth();
+
     const navItems = [
         { icon: LayoutDashboard, label: 'Dashboard', path: '/dashboard' },
         { icon: FolderKanban, label: 'Projeler', path: '/projects' },
@@ -25,6 +30,15 @@ const Sidebar = () => {
         { icon: Package, label: 'Envanter', path: '/inventory' },
         { icon: Settings, label: 'Ayarlar', path: '/settings' },
     ];
+
+    const handleLogout = async () => {
+        try {
+            await signOut();
+            toast.success('Çıkış yapıldı');
+        } catch (error) {
+            toast.error('Çıkış yapılırken bir hata oluştu');
+        }
+    };
 
     return (
         <aside className="hidden w-72 flex-col border-r bg-card/50 backdrop-blur-xl md:flex h-screen sticky top-0">
@@ -63,10 +77,14 @@ const Sidebar = () => {
                     </div>
                     <div className="flex flex-col overflow-hidden">
                         <span className="text-sm font-medium leading-none truncate">Kullanıcı</span>
-                        <span className="text-xs text-muted-foreground mt-1 truncate">kullanici@hayalet.com</span>
+                        <span className="text-xs text-muted-foreground mt-1 truncate" title={user?.email}>{user?.email || 'Giriş Yapılmadı'}</span>
                     </div>
                 </div>
-                <Button variant="outline" className="w-full justify-start gap-2 text-muted-foreground hover:text-destructive hover:border-destructive hover:bg-destructive/10">
+                <Button
+                    variant="outline"
+                    className="w-full justify-start gap-2 text-muted-foreground hover:text-destructive hover:border-destructive hover:bg-destructive/10"
+                    onClick={handleLogout}
+                >
                     <LogOut className="h-4 w-4" />
                     Çıkış Yap
                 </Button>
