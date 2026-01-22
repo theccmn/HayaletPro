@@ -22,7 +22,8 @@ import {
     Eye,
     ArrowUpDown, // Restored
     Tag,
-    MapPin
+    MapPin,
+    AlertTriangle
 } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { useState } from 'react';
@@ -107,6 +108,28 @@ export default function ProjectDetail() {
 
     const isCompleted = statusInfo.label?.toLowerCase() === 'tamamlandı';
 
+    // Gecikmiş ödeme kontrolü
+    let isOverdue = false;
+    let overdueAmount = 0;
+    if (project.project_installments && project.project_installments.length > 0) {
+        let remainingPaid = paidAmount;
+        const today = new Date(new Date().setHours(0, 0, 0, 0));
+
+        project.project_installments.forEach((inst: any) => {
+            if (remainingPaid >= inst.amount) {
+                remainingPaid -= inst.amount;
+            } else {
+                // Bu taksit henüz tam ödenmemiş
+                const dueDate = new Date(inst.due_date);
+                if (dueDate < today) {
+                    isOverdue = true;
+                    overdueAmount += inst.amount - Math.max(0, remainingPaid);
+                    remainingPaid = 0;
+                }
+            }
+        });
+    }
+
     const confirmDelete = () => {
         if (projectToDelete) {
             deleteMutation.mutate(projectToDelete.id);
@@ -130,6 +153,12 @@ export default function ProjectDetail() {
                             <div className={cn("px-3 py-1 rounded-full text-xs font-bold border shadow-sm", statusInfo.color)}>
                                 {statusInfo.label}
                             </div>
+                            {isOverdue && (
+                                <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-red-100 text-red-700 text-xs font-bold border border-red-200 animate-pulse">
+                                    <AlertTriangle className="w-3.5 h-3.5" />
+                                    Ödeme Gecikti
+                                </div>
+                            )}
                         </div>
                         <p className="text-muted-foreground flex items-center gap-2 mt-1">
                             {client?.company && <span className="flex items-center gap-1"><Building2 className="w-3 h-3" /> {client.company}</span>}
@@ -429,24 +458,78 @@ export default function ProjectDetail() {
                                 <h4 className="text-sm font-medium text-muted-foreground mb-2">Taksit Planı</h4>
                                 {project.project_installments && project.project_installments.length > 0 ? (
                                     <div className="grid gap-2">
-                                        {project.project_installments.sort((a: any, b: any) => new Date(a.due_date).getTime() - new Date(b.due_date).getTime()).map((inst: any) => {
-                                            return (
-                                                <div key={inst.id} className="flex items-center justify-between p-3 rounded-lg border bg-card/50 text-sm">
-                                                    <div className="flex items-center gap-3">
-                                                        <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center">
-                                                            <Calendar className="w-3.5 h-3.5 text-muted-foreground" />
+                                        {(() => {
+                                            // Taksitleri sırala ve gecikme durumunu hesapla
+                                            const sortedInstallments = [...project.project_installments].sort((a: any, b: any) => new Date(a.due_date).getTime() - new Date(b.due_date).getTime());
+                                            let remainingPaidCalc = paidAmount;
+                                            const today = new Date(new Date().setHours(0, 0, 0, 0));
+
+                                            return sortedInstallments.map((inst: any) => {
+                                                // Bu taksit ödendi mi kontrol et
+                                                const isPaid = remainingPaidCalc >= inst.amount;
+                                                if (isPaid) {
+                                                    remainingPaidCalc -= inst.amount;
+                                                } else {
+                                                    remainingPaidCalc = 0;
+                                                }
+
+                                                const dueDate = new Date(inst.due_date);
+                                                const isInstOverdue = !isPaid && dueDate < today;
+
+                                                return (
+                                                    <div
+                                                        key={inst.id}
+                                                        className={cn(
+                                                            "flex items-center justify-between p-3 rounded-lg border text-sm transition-all",
+                                                            isInstOverdue
+                                                                ? "bg-red-50 border-red-300 ring-2 ring-red-200"
+                                                                : isPaid
+                                                                    ? "bg-green-50/50 border-green-200"
+                                                                    : "bg-card/50"
+                                                        )}
+                                                    >
+                                                        <div className="flex items-center gap-3">
+                                                            <div className={cn(
+                                                                "w-8 h-8 rounded-full flex items-center justify-center",
+                                                                isInstOverdue
+                                                                    ? "bg-red-100 text-red-600"
+                                                                    : isPaid
+                                                                        ? "bg-green-100 text-green-600"
+                                                                        : "bg-muted text-muted-foreground"
+                                                            )}>
+                                                                {isInstOverdue ? (
+                                                                    <AlertTriangle className="w-3.5 h-3.5" />
+                                                                ) : isPaid ? (
+                                                                    <CheckCircle2 className="w-3.5 h-3.5" />
+                                                                ) : (
+                                                                    <Calendar className="w-3.5 h-3.5" />
+                                                                )}
+                                                            </div>
+                                                            <div>
+                                                                <div className={cn(
+                                                                    "font-medium",
+                                                                    isInstOverdue && "text-red-700"
+                                                                )}>
+                                                                    {format(dueDate, 'd MMM yyyy', { locale: tr })}
+                                                                </div>
+                                                                <div className={cn(
+                                                                    "text-xs",
+                                                                    isInstOverdue ? "text-red-600" : "text-muted-foreground"
+                                                                )}>
+                                                                    {isInstOverdue ? "Gecikmiş ödeme" : isPaid ? "Ödendi" : (inst.notes || 'Taksit')}
+                                                                </div>
+                                                            </div>
                                                         </div>
-                                                        <div>
-                                                            <div className="font-medium">{format(new Date(inst.due_date), 'd MMM yyyy', { locale: tr })}</div>
-                                                            <div className="text-xs text-muted-foreground">{inst.notes || 'Taksit ödemesi'}</div>
+                                                        <div className={cn(
+                                                            "font-bold",
+                                                            isInstOverdue ? "text-red-700" : isPaid ? "text-green-600" : ""
+                                                        )}>
+                                                            {inst.amount.toLocaleString('tr-TR', { style: 'currency', currency: 'TRY', maximumFractionDigits: 0 })}
                                                         </div>
                                                     </div>
-                                                    <div className="font-bold">
-                                                        {inst.amount.toLocaleString('tr-TR', { style: 'currency', currency: 'TRY', maximumFractionDigits: 0 })}
-                                                    </div>
-                                                </div>
-                                            );
-                                        })}
+                                                );
+                                            });
+                                        })()}
                                     </div>
                                 ) : (
                                     <div className="text-center py-6 border border-dashed rounded-lg text-muted-foreground text-sm">

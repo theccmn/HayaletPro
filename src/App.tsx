@@ -16,6 +16,8 @@ import { AuthProvider } from './contexts/AuthContext';
 import { AppSettingsProvider } from './context/AppSettingsContext';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import ProjectDetail from './pages/ProjectDetail';
+import OverduePayments from './pages/OverduePayments';
+import UpcomingProjects from './pages/UpcomingProjects';
 
 function App() {
   return (
@@ -45,6 +47,8 @@ function App() {
                 <Route path="clients/:id" element={<ClientDetail />} />
                 <Route path="inventory" element={<Inventory />} />
                 <Route path="settings" element={<Settings />} />
+                <Route path="overdue-payments" element={<OverduePayments />} />
+                <Route path="upcoming-projects" element={<UpcomingProjects />} />
                 <Route path="*" element={<div className="p-4">Sayfa bulunamadı</div>} />
               </Route>
             </Routes>

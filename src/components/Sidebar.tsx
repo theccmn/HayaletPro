@@ -26,7 +26,7 @@ const Sidebar = () => {
     const [isProfileSettingsOpen, setIsProfileSettingsOpen] = useState(false);
 
     const navItems = [
-        { icon: LayoutDashboard, label: 'Dashboard', path: '/dashboard' },
+        { icon: LayoutDashboard, label: 'Gösterge Paneli', path: '/dashboard' },
         { icon: FolderKanban, label: 'Projeler', path: '/projects' },
         { icon: Calculator, label: 'Muhasebe', path: '/finance' },
         { icon: Calendar, label: 'Takvim', path: '/calendar' },
