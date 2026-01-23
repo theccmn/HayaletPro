@@ -129,8 +129,8 @@ export default function Dashboard() {
                     suffix="kayıtlı"
                     hasWarning={hasUpcomingProjects}
                     warningText={hasUpcomingProjects ? `${upcomingProjects.length} yaklaşan proje` : undefined}
-                    isClickable={hasUpcomingProjects}
-                    onClick={hasUpcomingProjects ? () => navigate('/upcoming-projects') : undefined}
+                    onClick={() => navigate(`/projects?timeFilter=${projeFilter}`)}
+                    isClickable={true}
                 />
             </div>
 

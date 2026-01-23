@@ -406,14 +406,19 @@ export default function ClientDetail() {
                                 let isOverdue = false;
                                 if (project.project_installments) {
                                     let remainingPaid = paid;
-                                    isOverdue = project.project_installments.some(inst => {
+                                    const sortedInstallments = [...project.project_installments].sort((a: any, b: any) =>
+                                        new Date(a.due_date).getTime() - new Date(b.due_date).getTime()
+                                    );
+
+                                    isOverdue = sortedInstallments.some(inst => {
                                         if (remainingPaid >= inst.amount) {
                                             remainingPaid -= inst.amount;
-                                            return false;
-                                        } else {
-                                            remainingPaid = 0;
-                                            return new Date(inst.due_date) < new Date(new Date().setHours(0, 0, 0, 0));
+                                            return false; // Paid, not overdue
                                         }
+                                        // Not fully paid. Check if overdue.
+                                        // Note: We do NOT reset remainingPaid here, so if there was 
+                                        // partial money left, it could pay a later smaller installment.
+                                        return new Date(inst.due_date) < new Date(new Date().setHours(0, 0, 0, 0));
                                     });
                                 }
 

@@ -90,7 +90,7 @@ export default function UpcomingProjects() {
                     <ArrowLeft className="h-5 w-5" />
                 </Button>
                 <div>
-                    <h1 className="text-3xl font-bold tracking-tight">Yaklaşan Projeler</h1>
+                    <h1 className="text-3xl font-bold tracking-tight">Projeler</h1>
                     <p className="text-muted-foreground">7 gün içinde başlayacak veya bitecek projeler.</p>
                 </div>
             </div>

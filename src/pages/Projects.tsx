@@ -17,7 +17,8 @@ import { PaymentDetailsDialog } from '../components/PaymentDetailsDialog';
 import { LocationTypeManagerDialog } from '../components/LocationTypeManagerDialog';
 import { LocationManagerDialog } from '../components/LocationManagerDialog';
 import { getTransactions } from '../services/apiFinance';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+import { filterProjectsByDate, type TimeFilter } from '../utils/dateFilters';
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -88,6 +89,9 @@ const ProjectActions = ({
 
 export default function Projects() {
     const navigate = useNavigate();
+    const [searchParams] = useSearchParams();
+    const timeFilter = searchParams.get('timeFilter') as TimeFilter | null;
+
     const [viewMode, setViewMode] = useState<'grid' | 'list' | 'kanban'>('grid');
     const [cardSize, setCardSize] = useState<'sm' | 'md' | 'lg'>('md');
     const [sortBy, setSortBy] = useState<'date_desc' | 'date_asc' | 'price_desc' | 'price_asc' | 'name_asc' | 'status'>('date_desc');
@@ -235,6 +239,29 @@ export default function Projects() {
     };
 
     const filteredProjects = projects?.filter(p => {
+        // Time Filter (URL param)
+        if (timeFilter) {
+            // Re-use logic from dateFilters via utility
+            // But since we need to filter inside this loop along with other conditions, 
+            // checking it here is cleaner or we can pre-filter `projects`.
+            // Let's pre-filter mostly, but here we can just use the utility for the single item check 
+            // OR simpler: check if it's in the filtered list.
+
+            // Performance-wise, let's filter purely by ID inclusion or better yet:
+            // Modify logic to check date range manually or use utility on the side.
+            // Since `filterProjectsByDate` takes an array, let's use it outside or check dates here.
+
+            // Easiest approach given we are inside .filter(): check date manually using date-fns isWithinInterval 
+            // matching the utility logic. BUT we imported the utility. 
+            // Let's stick to the utility. Since we can't easily use array-filter utility inside item-filter,
+            // let's do this: 
+            // 1. If timeFilter is set, first verify this project is in the valid date range.
+            // Actually, let's move the `projects?.filter` to `(timeFilter ? filterProjectsByDate(projects, timeFilter) : projects)?.filter...` 
+            // checks.
+            return true;
+        }
+        return true;
+    }).filter(p => {
         // Filter by specific status
         if (filterByStatus) {
             if (p.status_id !== filterByStatus) return false;
@@ -257,7 +284,13 @@ export default function Projects() {
         return true;
     });
 
-    const sortedProjects = filteredProjects ? [...filteredProjects].sort((a, b) => {
+    // Apply Time Filter strictly
+    const timeFilteredProjects = timeFilter && filteredProjects
+        ? filterProjectsByDate(filteredProjects, timeFilter)
+        : filteredProjects;
+
+    // Sort
+    const sortedProjects = timeFilteredProjects ? [...timeFilteredProjects].sort((a, b) => {
         switch (sortBy) {
             case 'date_desc':
                 return new Date(b.start_date || 0).getTime() - new Date(a.start_date || 0).getTime();
@@ -283,7 +316,25 @@ export default function Projects() {
             <div className="flex items-center justify-between">
                 <div>
                     <h1 className="text-3xl font-bold tracking-tight">Projeler</h1>
-                    <p className="text-muted-foreground">Tüm stüdyo çekimlerinizi buradan yönetin.</p>
+                    <p className="text-muted-foreground">
+                        {timeFilter
+                            ? `${timeFilter === 'all' ? 'Tüm zamanların' :
+                                timeFilter === 'day' ? 'Bugünün' :
+                                    timeFilter === 'week' ? 'Bu haftanın' :
+                                        timeFilter === 'month' ? 'Bu ayın' :
+                                            timeFilter === 'year' ? 'Bu yılın' : ''} projeleri görüntüleniyor.`
+                            : 'Tüm stüdyo çekimlerinizi buradan yönetin.'}
+                    </p>
+                    {timeFilter && (
+                        <Button
+                            variant="secondary"
+                            size="sm"
+                            className="mt-2 h-7 text-xs"
+                            onClick={() => navigate('/projects')}
+                        >
+                            Filtreyi Temizle
+                        </Button>
+                    )}
                 </div>
                 {/* Search Bar */}
                 <div className="flex-1 max-w-sm ml-4 lg:ml-8">
@@ -499,14 +550,17 @@ export default function Projects() {
                         let isOverdue = false;
                         if (project.project_installments && transactions) {
                             let remainingPaid = projectIncome;
-                            isOverdue = project.project_installments.some(inst => {
+                            const sortedInstallments = [...project.project_installments].sort((a: any, b: any) =>
+                                new Date(a.due_date).getTime() - new Date(b.due_date).getTime()
+                            );
+
+                            isOverdue = sortedInstallments.some(inst => {
                                 if (remainingPaid >= inst.amount) {
                                     remainingPaid -= inst.amount;
                                     return false;
-                                } else {
-                                    remainingPaid = 0;
-                                    return new Date(inst.due_date) < new Date(new Date().setHours(0, 0, 0, 0));
                                 }
+                                // Not fully paid. Check if overdue without clearing remainingPaid
+                                return new Date(inst.due_date) < new Date(new Date().setHours(0, 0, 0, 0));
                             });
                         }
 
@@ -635,14 +689,17 @@ export default function Projects() {
                                                         .reduce((sum, t) => sum + (t.amount || 0), 0);
 
                                                     let remainingPaid = projectIncome;
-                                                    const isOverdue = project.project_installments.some(inst => {
+                                                    const sortedInstallments = [...project.project_installments].sort((a: any, b: any) =>
+                                                        new Date(a.due_date).getTime() - new Date(b.due_date).getTime()
+                                                    );
+
+                                                    const isOverdue = sortedInstallments.some(inst => {
                                                         if (remainingPaid >= inst.amount) {
                                                             remainingPaid -= inst.amount;
                                                             return false;
-                                                        } else {
-                                                            remainingPaid = 0;
-                                                            return new Date(inst.due_date) < new Date(new Date().setHours(0, 0, 0, 0));
                                                         }
+                                                        // Not fully paid. Check if overdue.
+                                                        return new Date(inst.due_date) < new Date(new Date().setHours(0, 0, 0, 0));
                                                     });
 
                                                     if (isOverdue) {

@@ -115,16 +115,19 @@ export default function ProjectDetail() {
         let remainingPaid = paidAmount;
         const today = new Date(new Date().setHours(0, 0, 0, 0));
 
+        project.project_installments.sort((a: any, b: any) => new Date(a.due_date).getTime() - new Date(b.due_date).getTime());
+
         project.project_installments.forEach((inst: any) => {
             if (remainingPaid >= inst.amount) {
                 remainingPaid -= inst.amount;
             } else {
-                // Bu taksit henüz tam ödenmemiş
+                // Yeterli bakiye yok, bu taksiti atla ama bakiyeyi sıfırlama
+                // Böylece sonraki küçük taksitler (örn: kapora) ödendi görünebilir
                 const dueDate = new Date(inst.due_date);
                 if (dueDate < today) {
                     isOverdue = true;
-                    overdueAmount += inst.amount - Math.max(0, remainingPaid);
-                    remainingPaid = 0;
+                    overdueAmount += inst.amount;
+                    // Not: Kalan bakiyeyi burada düşmüyoruz, belki sonraki taksite yeter
                 }
             }
         });
@@ -466,12 +469,15 @@ export default function ProjectDetail() {
 
                                             return sortedInstallments.map((inst: any) => {
                                                 // Bu taksit ödendi mi kontrol et
+                                                // Eğer bakiye yetiyorsa öde ve düş, yetmiyorsa pas geç (bakiyeyi koru)
+                                                // Bu sayede büyük bir taksit ödenmemiş olsa bile, sonraki küçük taksit (örn: Kapora) 
+                                                // ödendi olarak görünebilir.
                                                 const isPaid = remainingPaidCalc >= inst.amount;
                                                 if (isPaid) {
                                                     remainingPaidCalc -= inst.amount;
-                                                } else {
-                                                    remainingPaidCalc = 0;
                                                 }
+                                                // else: Bakiye yetmiyorsa düşme, sonraki taksitte dene
+
 
                                                 const dueDate = new Date(inst.due_date);
                                                 const isInstOverdue = !isPaid && dueDate < today;

@@ -13,7 +13,7 @@ import {
     parseISO,
 } from 'date-fns';
 import { tr } from 'date-fns/locale';
-import type { Project, Transaction, Installment } from '../types';
+import type { Project, Transaction } from '../types';
 
 export type TimeFilter = 'day' | 'week' | 'month' | 'year' | 'all';
 
@@ -122,7 +122,12 @@ export function getUpcomingPayments(
 
         let remainingPaid = projectIncome;
 
-        project.project_installments.forEach((inst) => {
+        // Sort installments by date
+        const sortedInstallments = [...project.project_installments].sort((a: any, b: any) =>
+            new Date(a.due_date).getTime() - new Date(b.due_date).getTime()
+        );
+
+        sortedInstallments.forEach((inst) => {
             const amount = inst.amount;
             const dueDate = parseISO(inst.due_date);
 
@@ -131,7 +136,8 @@ export function getUpcomingPayments(
                 return; // Already paid
             }
 
-            remainingPaid = 0;
+            // Don't reset remainingPaid = 0;
+            // logic continues to check if THIS specific installment is overdue
 
             // Check if within filter range and not in past (unless overdue)
             const isOverdue = isBefore(dueDate, todayStart);

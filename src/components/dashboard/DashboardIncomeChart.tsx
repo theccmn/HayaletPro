@@ -37,7 +37,7 @@ interface DashboardIncomeChartProps {
 }
 
 export function DashboardIncomeChart({ transactions }: DashboardIncomeChartProps) {
-    const [period, setPeriod] = useState<TimeFilter>('day');
+    const [period, setPeriod] = useState<TimeFilter>('week');
 
     const chartData = useMemo(() => {
         if (!transactions.length) return [];
