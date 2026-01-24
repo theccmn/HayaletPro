@@ -19,6 +19,8 @@ import ProjectDetail from './pages/ProjectDetail';
 import OverduePayments from './pages/OverduePayments';
 import UpcomingProjects from './pages/UpcomingProjects';
 
+import TemplateBuilder from './pages/TemplateBuilder';
+
 function App() {
   return (
     <BrowserRouter>
@@ -49,6 +51,8 @@ function App() {
                 <Route path="settings" element={<Settings />} />
                 <Route path="overdue-payments" element={<OverduePayments />} />
                 <Route path="upcoming-projects" element={<UpcomingProjects />} />
+                <Route path="templates/new" element={<TemplateBuilder />} />
+                <Route path="templates/:id" element={<TemplateBuilder />} />
                 <Route path="*" element={<div className="p-4">Sayfa bulunamadı</div>} />
               </Route>
             </Routes>

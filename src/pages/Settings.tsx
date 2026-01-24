@@ -3,6 +3,8 @@ import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { getPackages, deletePackage } from '../services/apiPackages';
 import { getSetting, updateSetting } from '../services/apiSettings';
+import { getTemplates, deleteTemplate } from '../services/apiTemplates';
+import type { MessageTemplate } from '../services/apiTemplates';
 import { PackageDialog } from '../components/PackageDialog';
 import { ContractSettingsDialog } from '../components/ContractSettingsDialog';
 import { GoogleCalendarSettings } from '../components/GoogleCalendarSettings';
@@ -10,16 +12,51 @@ import { MailSettings } from '../components/MailSettings';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
-import { Plus, Edit, Trash2, Package as PackageIcon, Settings as SettingsIcon, Database, Save, CheckCircle, FileText } from 'lucide-react';
+import { Plus, Edit, Trash2, Package as PackageIcon, Settings as SettingsIcon, Database, Save, CheckCircle, FileText, Mail, Loader2 } from 'lucide-react';
 import type { Package } from '../types';
 import { cn } from '../lib/utils';
 import { toast } from 'sonner';
 
 export default function Settings() {
-    const [activeTab, setActiveTab] = useState<'packages' | 'integrations' | 'contract'>('packages');
+    const [activeTab, setActiveTab] = useState<'packages' | 'integrations' | 'contract' | 'templates'>('packages');
     const [isDialogOpen, setIsDialogOpen] = useState(false);
     const [isContractDialogOpen, setIsContractDialogOpen] = useState(false);
     const [itemToEdit, setItemToEdit] = useState<Package | null>(null);
+    const [templates, setTemplates] = useState<MessageTemplate[]>([]);
+    const [loadingTemplates, setLoadingTemplates] = useState(false);
+
+    useEffect(() => {
+        if (activeTab === 'templates') {
+            loadTemplates();
+        }
+    }, [activeTab]);
+
+    const loadTemplates = async () => {
+        setLoadingTemplates(true);
+        try {
+            const data = await getTemplates();
+            setTemplates(data);
+        } catch (error) {
+            console.error('Error loading templates:', error);
+            toast.error('Şablonlar yüklenirken hata oluştu');
+        } finally {
+            setLoadingTemplates(false);
+        }
+    };
+
+    const handleDeleteTemplate = async (id: string, e: React.MouseEvent) => {
+        e.stopPropagation();
+        if (confirm('Bu şablonu silmek istediğinize emin misiniz?')) {
+            try {
+                await deleteTemplate(id);
+                toast.success('Şablon silindi');
+                loadTemplates();
+            } catch (error) {
+                toast.error('Silme işlemi başarısız');
+            }
+        }
+    };
+
 
     // Integrations State
     const [driveApiKey, setDriveApiKey] = useState('');
@@ -182,6 +219,72 @@ export default function Settings() {
         </div>
     );
 
+    const renderTemplatesTab = () => (
+        <div className="space-y-6 animate-in fade-in duration-300">
+            <div className="flex justify-between items-center">
+                <div>
+                    <h3 className="text-lg font-medium">Mesaj Şablonları</h3>
+                    <p className="text-sm text-muted-foreground">E-posta ve mesaj şablonlarınızı buradan yönetin.</p>
+                </div>
+                <Button onClick={() => window.location.href = '/templates/new'} size="sm">
+                    <Plus className="mr-2 h-4 w-4" /> Yeni Şablon
+                </Button>
+            </div>
+
+            {loadingTemplates ? (
+                <div className="flex justify-center p-8">
+                    <Loader2 className="animate-spin text-primary" size={32} />
+                </div>
+            ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {templates.length === 0 && (
+                        <div className="col-span-full text-center p-8 border-2 border-dashed rounded-xl text-muted-foreground">
+                            Henüz şablon oluşturulmamış.
+                        </div>
+                    )}
+                    {templates.map((template) => (
+                        <div
+                            key={template.id}
+                            className="border rounded-xl p-5 bg-card hover:border-primary/50 transition-colors group relative"
+                        >
+                            <div className="flex justify-between items-start mb-2">
+                                <div className="p-2 bg-indigo-50 text-indigo-600 rounded-lg mb-3">
+                                    <Mail size={20} />
+                                </div>
+                                <div className="flex items-center opacity-0 group-hover:opacity-100 transition-opacity bg-white border rounded-lg shadow-sm">
+                                    <button
+                                        onClick={() => window.location.href = `/templates/${template.id}`}
+                                        className="text-gray-500 hover:text-indigo-600 p-1.5 hover:bg-gray-50 rounded-l-lg border-r"
+                                        title="Düzenle"
+                                    >
+                                        <Edit size={14} />
+                                    </button>
+                                    <button
+                                        onClick={(e) => handleDeleteTemplate(template.id, e)}
+                                        className="text-gray-500 hover:text-red-600 p-1.5 hover:bg-red-50 rounded-r-lg"
+                                        title="Sil"
+                                    >
+                                        <Trash2 size={14} />
+                                    </button>
+                                </div>
+                            </div>
+                            <h4 className="font-semibold text-lg mb-1 truncate" title={template.name}>{template.name}</h4>
+                            <p className="text-sm text-muted-foreground mb-4 line-clamp-2 min-h-[40px]">
+                                {template.description || 'Açıklama yok'}
+                            </p>
+                            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                                <span className={`px-2 py-0.5 rounded-full ${template.is_active ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-700'}`}>
+                                    {template.is_active ? 'Aktif' : 'Pasif'}
+                                </span>
+                                <span>• {new Date(template.updated_at).toLocaleDateString('tr-TR')}</span>
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            )}
+        </div>
+    );
+
     return (
         <div className="flex flex-col md:flex-row gap-8 h-full">
             {/* Sidebar */}
@@ -217,6 +320,16 @@ export default function Settings() {
                     <FileText className="h-4 w-4" />
                     Sözleşme Şablonu
                 </button>
+                <button
+                    onClick={() => setActiveTab('templates')}
+                    className={cn(
+                        "w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors text-left",
+                        activeTab === 'templates' ? "bg-primary/10 text-primary" : "hover:bg-muted text-muted-foreground"
+                    )}
+                >
+                    <Mail className="h-4 w-4" />
+                    Mesaj Şablonları
+                </button>
             </div>
 
             {/* Content */}
@@ -224,6 +337,7 @@ export default function Settings() {
                 {activeTab === 'packages' && renderPackagesTab()}
                 {activeTab === 'integrations' && renderIntegrationsTab()}
                 {activeTab === 'contract' && renderContractTab()}
+                {activeTab === 'templates' && renderTemplatesTab()}
             </div>
 
             <PackageDialog
