@@ -7,7 +7,10 @@ const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
 // Interface for Email Request
 interface EmailRequest {
-    type: "selection_completed" | "test_email";
+    type: "selection_completed" | "test_email" | "workflow_notification";
+    to?: string; // For workflow_notification
+    subject?: string; // For workflow_notification
+    content?: string; // For workflow_notification
     payload?: {
         project_title?: string;
         client_name?: string;
@@ -60,7 +63,7 @@ serve(async (req) => {
 
         const { type, payload } = bodyData as EmailRequest;
 
-        if ((!payload && type !== "test_email") || !type) {
+        if ((!payload && type !== "test_email" && type !== "workflow_notification") || !type) {
             throw new Error("Invalid request body: Missing type or payload");
         }
 
@@ -101,10 +104,14 @@ serve(async (req) => {
 
             if (!res.ok) {
                 console.error("Resend API Error:", data);
-                throw new Error(`Resend API Error: ${data.message || 'Unknown error'}`);
+                // Return 200 with error info so client can see the message
+                return new Response(JSON.stringify({ success: false, error: `Resend API Error: ${data.message || data.name || 'Unknown'}` }), {
+                    status: 200,
+                    headers: { ...corsHeaders, "Content-Type": "application/json" },
+                });
             }
 
-            return new Response(JSON.stringify(data), {
+            return new Response(JSON.stringify({ success: true, data }), {
                 headers: { ...corsHeaders, "Content-Type": "application/json" },
             });
         }
@@ -112,7 +119,7 @@ serve(async (req) => {
         if (type === "selection_completed") {
             const senderName = fromName || "Hayalet Pro";
             const senderEmail = fromEmail || "onboarding@resend.dev";
-            const recipient = adminEmail || "admin@example.com"; // Fallback strictly for dev, maybe should error
+            const recipient = adminEmail || "admin@example.com";
 
             const res = await fetch("https://api.resend.com/emails", {
                 method: "POST",
@@ -144,22 +151,77 @@ serve(async (req) => {
 
             if (!res.ok) {
                 console.error("Resend API Error:", data);
-                throw new Error(`Resend API Error: ${data.message || 'Unknown error'}`);
+                return new Response(JSON.stringify({ success: false, error: `Resend API Error: ${data.message || 'Unknown error'}` }), {
+                    status: 200,
+                    headers: { ...corsHeaders, "Content-Type": "application/json" },
+                });
             }
 
-            return new Response(JSON.stringify(data), {
+            return new Response(JSON.stringify({ success: true, data }), {
                 headers: { ...corsHeaders, "Content-Type": "application/json" },
             });
         }
 
-        return new Response(JSON.stringify({ message: "Unknown event type" }), {
+        // Workflow notification - müşteriye e-posta
+        if (type === "workflow_notification") {
+            const senderName = fromName || "Hayalet Pro";
+            const senderEmail = fromEmail || "onboarding@resend.dev";
+            const recipient = bodyData.to;
+            const emailSubject = bodyData.subject || "Proje Güncelleme";
+            // Eğer 'html' parametresi gelirse direkt onu kullan, yoksa 'content'i varsayılan şablona sar
+            const customHtml = bodyData.html;
+            const textContent = bodyData.content || "";
+
+            if (!recipient) {
+                throw new Error("Alıcı e-posta adresi belirtilmedi.");
+            }
+
+            const finalHtml = customHtml || `
+            <div style="font-family: sans-serif; padding: 20px; line-height: 1.6;">
+              <div style="white-space: pre-wrap;">${textContent}</div>
+              <hr style="margin: 30px 0; border: none; border-top: 1px solid #eee;" />
+              <p style="color: #888; font-size: 12px;">Bu e-posta ${senderName} tarafından otomatik olarak gönderilmiştir.</p>
+            </div>
+          `;
+
+            const res = await fetch("https://api.resend.com/emails", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    Authorization: `Bearer ${apiKey}`,
+                },
+                body: JSON.stringify({
+                    from: `${senderName} <${senderEmail}>`,
+                    to: recipient,
+                    subject: emailSubject,
+                    html: finalHtml,
+                }),
+            });
+
+            const data = await res.json();
+
+            if (!res.ok) {
+                console.error("Resend API Error:", data);
+                return new Response(JSON.stringify({ success: false, error: `Resend API Error: ${data.message || 'Unknown error'}` }), {
+                    status: 200,
+                    headers: { ...corsHeaders, "Content-Type": "application/json" },
+                });
+            }
+
+            return new Response(JSON.stringify({ success: true, data }), {
+                headers: { ...corsHeaders, "Content-Type": "application/json" },
+            });
+        }
+
+        return new Response(JSON.stringify({ error: "Unknown event type" }), {
             headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
 
     } catch (error: any) {
         console.error("Edge Function Error:", error);
-        return new Response(JSON.stringify({ error: error.message }), {
-            status: 500,
+        // Using status 200 to pass error message to client
+        return new Response(JSON.stringify({ success: false, error: error.message }), {
+            status: 200,
             headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
     }

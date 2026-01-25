@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, ReactNode } from 'react';
+import { createContext, useContext, useEffect, type ReactNode } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { getAppSettings, updateAppSettings, type AppSettings } from '../services/apiAppSettings';
 import { toast } from 'sonner';

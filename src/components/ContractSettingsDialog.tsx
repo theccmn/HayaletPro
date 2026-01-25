@@ -14,7 +14,6 @@ import {
     CONTRACT_PLACEHOLDERS,
 } from '../services/apiContract';
 import {
-    Upload,
     Trash2,
     Save,
     Loader2,

@@ -20,6 +20,7 @@ import OverduePayments from './pages/OverduePayments';
 import UpcomingProjects from './pages/UpcomingProjects';
 
 import TemplateBuilder from './pages/TemplateBuilder';
+import Workflows from './pages/Workflows';
 
 function App() {
   return (
@@ -48,6 +49,7 @@ function App() {
                 <Route path="clients" element={<Clients />} />
                 <Route path="clients/:id" element={<ClientDetail />} />
                 <Route path="inventory" element={<Inventory />} />
+                <Route path="workflows" element={<Workflows />} />
                 <Route path="settings" element={<Settings />} />
                 <Route path="overdue-payments" element={<OverduePayments />} />
                 <Route path="upcoming-projects" element={<UpcomingProjects />} />

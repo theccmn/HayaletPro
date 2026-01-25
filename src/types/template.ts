@@ -1,4 +1,4 @@
-import { Badge } from 'lucide-react';
+
 
 export interface MessageTemplate {
     id: string;

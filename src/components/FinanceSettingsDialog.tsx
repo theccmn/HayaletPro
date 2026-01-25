@@ -2,13 +2,11 @@ import { useState } from 'react';
 import { Dialog as CustomDialog } from './ui/dialog';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
-import { Label } from './ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { getFinanceSettings, createFinanceSetting, updateFinanceSetting, deleteFinanceSetting } from '../services/apiFinance';
 import { ArrowUp, ArrowDown, Plus, Trash2, Edit2, Save, X } from 'lucide-react';
-import type { FinanceSetting, NewFinanceSetting } from '../types';
-import { cn } from '../lib/utils';
+import type { FinanceSetting } from '../types';
 
 interface FinanceSettingsDialogProps {
     isOpen: boolean;

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { toast } from 'sonner';
 import { Dialog } from './ui/dialog';
 import { Button } from './ui/button';
@@ -6,7 +6,6 @@ import { Input } from './ui/input';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { createLocation, deleteLocation, getLocations } from '../services/apiLocations';
 import { Plus, Trash2, MapPin } from 'lucide-react';
-import type { Location } from '../types';
 import {
     AlertDialog,
     AlertDialogAction,

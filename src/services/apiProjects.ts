@@ -50,17 +50,28 @@ export const createProject = async (project: Omit<Project, 'id' | 'created_at'>)
     return data as Project;
 };
 
-export const updateProjectStatus = async (id: string, statusId: string) => {
+export const updateProjectStatus = async (id: string, statusId: string, oldStatusId?: string) => {
     const { data, error } = await supabase
         .from('projects')
         .update({ status_id: statusId })
         .eq('id', id)
-        .select()
+        .select('*, clients(*), photo_selections(*), project_installments(*), project_types(*), location_types(*), locations(*)')
         .single();
 
     if (error) {
         console.error('Error updating project status:', error);
         throw error;
+    }
+
+    // Workflow tetikleme - arka planda çalışsın
+    if (oldStatusId && oldStatusId !== statusId) {
+        import('./workflowTrigger').then(({ triggerStatusChangeWorkflows }) => {
+            triggerStatusChangeWorkflows({
+                project: data,
+                oldStatusId,
+                newStatusId: statusId
+            }).catch(err => console.error('[Workflow] Tetikleme hatası:', err));
+        });
     }
 
     return data;

@@ -59,6 +59,10 @@ export function MailSettings() {
 
             if (error) throw error;
 
+            if (data && data.success === false) {
+                throw new Error(data.error);
+            }
+
             toast.success("Test maili gönderildi! Gelen kutunuzu kontrol edin.");
         } catch (error: any) {
             console.error(error);

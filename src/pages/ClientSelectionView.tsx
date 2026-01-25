@@ -186,8 +186,8 @@ export function ClientSelectionView() {
                     }
                 }
             });
-            if (error) {
-                console.error('Edge Function Error:', error);
+            if (error || (data && data.success === false)) {
+                console.error('Edge Function Error:', error || data?.error);
             } else {
                 console.log('Edge Function Response:', data);
             }

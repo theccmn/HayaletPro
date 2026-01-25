@@ -146,8 +146,8 @@ export default function Projects() {
     });
 
     const updateStatusMutation = useMutation({
-        mutationFn: ({ id, status }: { id: string; status: string }) =>
-            updateProjectStatus(id, status),
+        mutationFn: ({ id, status, oldStatus }: { id: string; status: string; oldStatus?: string }) =>
+            updateProjectStatus(id, status, oldStatus),
         onMutate: async ({ id, status }) => {
             await queryClient.cancelQueries({ queryKey: ['projects'] });
             const previousProjects = queryClient.getQueryData<Project[]>(['projects']);
@@ -169,6 +169,7 @@ export default function Projects() {
             queryClient.invalidateQueries({ queryKey: ['projects'] });
         },
     });
+
 
     const handleCreateClick = () => {
         setProjectToEdit(null);
@@ -206,8 +207,8 @@ export default function Projects() {
         }
     };
 
-    const handleStatusChange = (projectId: string, newStatus: string) => {
-        updateStatusMutation.mutate({ id: projectId, status: newStatus });
+    const handleStatusChange = (projectId: string, newStatus: string, oldStatus?: string) => {
+        updateStatusMutation.mutate({ id: projectId, status: newStatus, oldStatus });
     };
 
     if (isLoading) {
@@ -238,7 +239,7 @@ export default function Projects() {
         return status ? status.color : 'bg-gray-100 text-gray-700';
     };
 
-    const filteredProjects = projects?.filter(p => {
+    const filteredProjects = projects?.filter(_p => {
         // Time Filter (URL param)
         if (timeFilter) {
             // Re-use logic from dateFilters via utility

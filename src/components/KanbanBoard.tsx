@@ -9,7 +9,7 @@ interface KanbanBoardProps {
     projects: Project[];
     statuses: ProjectStatus[];
     transactions?: Transaction[];
-    onStatusChange: (projectId: string, newStatus: string) => void;
+    onStatusChange: (projectId: string, newStatus: string, oldStatus?: string) => void;
     onEdit: (project: Project) => void;
     onDelete: (project: Project) => void;
     onAddTransaction: (project: Project) => void;
@@ -91,8 +91,8 @@ export function KanbanBoard({ projects, statuses, transactions, onStatusChange, 
             const finishStatusId = destination.droppableId;
 
             if (startStatusId !== finishStatusId) {
-                // Status changed
-                onStatusChange(draggableId, finishStatusId);
+                // Status changed - workflow tetiklemesi için eski durumu da gönder
+                onStatusChange(draggableId, finishStatusId, startStatusId);
             } else {
                 // Same column reordering (Optional: Implement if backend supports it)
                 // For now, we don't have project ranking, so we just visual reorder?

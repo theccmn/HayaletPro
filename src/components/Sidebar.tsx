@@ -10,7 +10,8 @@ import {
     Settings,
     LogOut,
     UserCircle,
-    Ghost
+    Ghost,
+    Workflow
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { Button } from './ui/button';
@@ -32,6 +33,7 @@ const Sidebar = () => {
         { icon: Calendar, label: 'Takvim', path: '/calendar' },
         { icon: Users, label: 'Müşteriler', path: '/clients' },
         { icon: Package, label: 'Envanter', path: '/inventory' },
+        { icon: Workflow, label: 'İş Akışları', path: '/workflows' },
         { icon: Settings, label: 'Ayarlar', path: '/settings' },
     ];
 

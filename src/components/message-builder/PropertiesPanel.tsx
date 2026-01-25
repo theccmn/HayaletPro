@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { useTemplateStore } from '../../stores/useTemplateStore';
 import { X, Smile, Plus } from 'lucide-react';
 import EmojiPicker from 'emoji-picker-react';
