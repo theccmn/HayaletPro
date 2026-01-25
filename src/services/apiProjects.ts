@@ -78,16 +78,44 @@ export const updateProjectStatus = async (id: string, statusId: string, oldStatu
 };
 
 export const updateProject = async (id: string, project: Partial<Omit<Project, 'id' | 'created_at'>>) => {
+    // 1. Mevcut projeyi çek (status değişikliğini kontrol etmek için)
+    const { data: currentProject, error: fetchError } = await supabase
+        .from('projects')
+        .select('status_id')
+        .eq('id', id)
+        .single();
+
+    if (fetchError) {
+        console.error('Error fetching current project:', fetchError);
+        // Hata olsa bile update'i denemeye devam edebiliriz veya durdurabiliriz.
+        // Güvenli olması için devam edelim ama workflow çalışmayabilir.
+    }
+
+    // 2. Projeyi güncelle
     const { data, error } = await supabase
         .from('projects')
         .update(project)
         .eq('id', id)
-        .select()
+        .select('*, clients(*), photo_selections(*), project_installments(*), project_types(*), location_types(*), locations(*)')
         .single();
 
     if (error) {
         console.error('Error updating project:', error);
         throw error;
+    }
+
+    // 3. Workflow tetikleme - arka planda çalışsın
+    const oldStatusId = currentProject?.status_id;
+    const newStatusId = project.status_id;
+
+    if (newStatusId && oldStatusId && oldStatusId !== newStatusId) {
+        import('./workflowTrigger').then(({ triggerStatusChangeWorkflows }) => {
+            triggerStatusChangeWorkflows({
+                project: data,
+                oldStatusId,
+                newStatusId
+            }).catch(err => console.error('[Workflow] Tetikleme hatası (updateProject):', err));
+        });
     }
 
     return data;

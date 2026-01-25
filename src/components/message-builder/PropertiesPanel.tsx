@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useTemplateStore } from '../../stores/useTemplateStore';
+import { supabase } from '../../lib/supabase';
 import { X, Smile, Plus } from 'lucide-react';
 import EmojiPicker from 'emoji-picker-react';
 import { SMART_VARIABLES } from '../../constants/smartVariables';
@@ -183,9 +184,15 @@ export const PropertiesPanel = () => {
                         <div>
                             <label className="block text-sm font-medium text-gray-700 mb-1">Görsel Kaynağı</label>
                             <div className="flex flex-col gap-3">
-                                <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-gray-300 border-dashed rounded-lg cursor-pointer bg-gray-50 hover:bg-gray-100 transition-colors">
-                                    <div className="flex flex-col items-center justify-center pt-5 pb-6">
-                                        <p className="mb-2 text-sm text-gray-500"><span className="font-semibold">Yüklemek için tıklayın</span></p>
+                                <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-gray-300 border-dashed rounded-lg cursor-pointer bg-gray-50 hover:bg-gray-100 transition-colors relative">
+                                    {selectedBlock.content.url && (
+                                        <div className="absolute inset-0 w-full h-full p-2">
+                                            <img src={selectedBlock.content.url} alt="Preview" className="w-full h-full object-contain rounded" />
+                                            <div className="absolute inset-0 bg-black bg-opacity-0 hover:bg-opacity-10 transition-all" />
+                                        </div>
+                                    )}
+                                    <div className={`flex flex-col items-center justify-center pt-5 pb-6 ${selectedBlock.content.url ? 'opacity-0 hover:opacity-100' : ''}`}>
+                                        <p className="mb-2 text-sm text-gray-500"><span className="font-semibold">{selectedBlock.content.url ? 'Değiştirmek için tıklayın' : 'Yüklemek için tıklayın'}</span></p>
                                         <p className="text-xs text-gray-500">PNG, JPG or GIF</p>
                                     </div>
                                     <input
@@ -195,11 +202,38 @@ export const PropertiesPanel = () => {
                                         onChange={async (e) => {
                                             const file = e.target.files?.[0];
                                             if (file) {
-                                                const reader = new FileReader();
-                                                reader.onloadend = () => {
-                                                    handleChange('url', reader.result as string);
-                                                };
-                                                reader.readAsDataURL(file);
+                                                try {
+                                                    // Upload to Supabase Storage
+                                                    const fileName = `${Date.now()}-${file.name.replace(/[^a-zA-Z0-9]/g, '_')}`;
+                                                    const { data, error } = await supabase.storage
+                                                        .from('workflow-assets')
+                                                        .upload(fileName, file);
+
+                                                    if (error) {
+                                                        console.error('Upload error:', error);
+                                                        // Fallback to FileReader if storage fails (or bucket doesn't exist yet)
+                                                        const reader = new FileReader();
+                                                        reader.onloadend = () => {
+                                                            handleChange('url', reader.result as string);
+                                                        };
+                                                        reader.readAsDataURL(file);
+                                                        // Show a toast or log here ideally
+                                                    } else {
+                                                        const { data: { publicUrl } } = supabase.storage
+                                                            .from('workflow-assets')
+                                                            .getPublicUrl(fileName);
+
+                                                        handleChange('url', publicUrl);
+                                                    }
+                                                } catch (err) {
+                                                    console.error('Upload exception:', err);
+                                                    // Fallback
+                                                    const reader = new FileReader();
+                                                    reader.onloadend = () => {
+                                                        handleChange('url', reader.result as string);
+                                                    };
+                                                    reader.readAsDataURL(file);
+                                                }
                                             }
                                         }}
                                     />
@@ -292,16 +326,6 @@ export const PropertiesPanel = () => {
                                 onChange={(e) => handleChange('text', e.target.value)}
                                 className="w-full px-3 py-2 border rounded-md text-sm focus:ring-indigo-500 focus:border-indigo-500 min-h-[80px]"
                             />
-                        </div>
-                        <div className="flex items-center gap-2">
-                            <input
-                                type="checkbox"
-                                id="showSocial"
-                                checked={selectedBlock.content.showSocial}
-                                onChange={(e) => handleChange('showSocial', e.target.checked)}
-                                className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
-                            />
-                            <label htmlFor="showSocial" className="text-sm text-gray-700">Sosyal Medya İkonlarını Göster</label>
                         </div>
                     </>
                 )}
