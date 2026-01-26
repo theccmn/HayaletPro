@@ -40,12 +40,17 @@ export const createProject = async (project: Omit<Project, 'id' | 'created_at'>)
     const { data, error } = await supabase
         .from('projects')
         .insert([project])
-        .select()
+        .select('*, clients(*), photo_selections(*), project_installments(*), project_types(*), location_types(*), locations(*)')
         .single();
 
     if (error) {
         throw new Error(error.message);
     }
+
+    // Workflow tetikleme - arka planda çalışsın
+    import('./workflowTrigger').then(({ triggerProjectCreatedWorkflows }) => {
+        triggerProjectCreatedWorkflows(data).catch(err => console.error('[Workflow] Tetikleme hatası (createProject):', err));
+    });
 
     return data as Project;
 };

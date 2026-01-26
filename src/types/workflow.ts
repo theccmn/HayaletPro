@@ -2,7 +2,7 @@
 export type TriggerType = 'event' | 'schedule';
 
 // Event-based triggers
-export type TriggerEvent = 
+export type TriggerEvent =
     | 'project_created'
     | 'project_status_changed'
     | 'project_cancelled'
@@ -28,27 +28,27 @@ export interface Workflow {
     id: string;
     name: string;
     description?: string;
-    
+
     // Trigger configuration
     trigger_type: TriggerType;
     trigger_event?: TriggerEvent;
     trigger_condition?: TriggerCondition;
-    
+
     // Schedule configuration
     schedule_type?: ScheduleType;
     schedule_offset?: number; // in minutes
-    
+
     // Template and channels
     template_id?: string;
     channels: WorkflowChannels;
-    
+
     // Status
     is_active: boolean;
-    
+
     // Timestamps
     created_at: string;
     updated_at: string;
-    
+
     // Joined data (optional)
     message_templates?: {
         id: string;
@@ -71,25 +71,15 @@ export interface WorkflowExecution {
 
 // Trigger options for UI
 export const TRIGGER_EVENT_OPTIONS: { value: TriggerEvent; label: string; description: string }[] = [
-    { 
-        value: 'project_created', 
-        label: 'Proje Oluşturuldu', 
-        description: 'Yeni bir proje oluşturulduğunda' 
+    {
+        value: 'project_created',
+        label: 'Proje Oluşturuldu',
+        description: 'Yeni bir proje oluşturulduğunda'
     },
-    { 
-        value: 'project_status_changed', 
-        label: 'Proje Durumu Değişti', 
-        description: 'Kanban\'da durum değiştiğinde' 
-    },
-    { 
-        value: 'project_cancelled', 
-        label: 'Proje İptal Edildi', 
-        description: 'Bir proje iptal edildiğinde' 
-    },
-    { 
-        value: 'photo_selection_completed', 
-        label: 'Fotoğraf Seçimi Tamamlandı', 
-        description: 'Müşteri fotoğraf seçimini tamamladığında' 
+    {
+        value: 'project_status_changed',
+        label: 'Proje Durumu Değişti',
+        description: 'Kanban\'da durum değiştiğinde'
     },
 ];
 

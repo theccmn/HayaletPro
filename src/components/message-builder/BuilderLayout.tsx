@@ -3,6 +3,7 @@ import { useTemplateStore } from '../../stores/useTemplateStore';
 import { createTemplate, updateTemplate, getTemplateById } from '../../services/apiTemplates';
 import { toast } from 'sonner';
 import { useNavigate } from 'react-router-dom';
+import { Edit2 } from 'lucide-react';
 
 interface BuilderLayoutProps {
     sidebar: ReactNode;
@@ -16,7 +17,8 @@ export const BuilderLayout = ({ sidebar, preview, toolbar, templateId }: Builder
     const reorderBlocks = useTemplateStore((state) => state.reorderBlocks);
     const [isSaving, setIsSaving] = useState(false);
     const [templateName, setTemplateName] = useState('Yeni Mesaj Şablonu');
-    const [isNameDialogOpen, setIsNameDialogOpen] = useState(false);
+    const [templateDescription, setTemplateDescription] = useState('');
+    const [isSettingsDialogOpen, setIsSettingsDialogOpen] = useState(false);
     const navigate = useNavigate();
 
     // Load template if editing
@@ -27,6 +29,7 @@ export const BuilderLayout = ({ sidebar, preview, toolbar, templateId }: Builder
                     const data = await getTemplateById(templateId);
                     if (data) {
                         setTemplateName(data.name);
+                        setTemplateDescription(data.description || '');
                         // Assuming data.blocks is the array of blocks
                         if (Array.isArray(data.blocks)) {
                             reorderBlocks(data.blocks);
@@ -44,7 +47,7 @@ export const BuilderLayout = ({ sidebar, preview, toolbar, templateId }: Builder
     const handleSaveClick = () => {
         // If it's a new template (no ID) and name is default or empty, ask for name
         if (!templateId && (templateName === 'Yeni Mesaj Şablonu' || !templateName.trim())) {
-            setIsNameDialogOpen(true);
+            setIsSettingsDialogOpen(true);
         } else {
             handleSaveProcess();
         }
@@ -55,6 +58,7 @@ export const BuilderLayout = ({ sidebar, preview, toolbar, templateId }: Builder
         try {
             const templateData = {
                 name: templateName,
+                description: templateDescription,
                 blocks: blocks,
                 updated_at: new Date().toISOString()
             };
@@ -75,7 +79,7 @@ export const BuilderLayout = ({ sidebar, preview, toolbar, templateId }: Builder
             toast.error('Şablon kaydedilirken bir hata oluştu');
         } finally {
             setIsSaving(false);
-            setIsNameDialogOpen(false);
+            setIsSettingsDialogOpen(false);
         }
     };
 
@@ -88,13 +92,22 @@ export const BuilderLayout = ({ sidebar, preview, toolbar, templateId }: Builder
                         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m15 18-6-6 6-6" /></svg>
                     </button>
                     <div>
-                        <input
-                            type="text"
-                            value={templateName}
-                            onChange={(e) => setTemplateName(e.target.value)}
-                            className="font-semibold text-gray-900 bg-transparent border-none focus:ring-0 p-0 text-lg placeholder-gray-400 focus:outline-none"
-                            placeholder="Şablon Adı Giriniz"
-                        />
+                        <div className="flex items-center gap-2 group">
+                            <input
+                                type="text"
+                                value={templateName}
+                                onChange={(e) => setTemplateName(e.target.value)}
+                                className="font-semibold text-gray-900 bg-transparent border-none focus:ring-0 p-0 text-lg placeholder-gray-400 focus:outline-none max-w-[300px]"
+                                placeholder="Şablon Adı Giriniz"
+                            />
+                            <button
+                                onClick={() => setIsSettingsDialogOpen(true)}
+                                className="text-gray-400 hover:text-indigo-600 opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:bg-indigo-50 rounded"
+                                title="Başlık ve açıklamayı düzenle"
+                            >
+                                <Edit2 size={14} />
+                            </button>
+                        </div>
                         <div className="flex items-center gap-2 text-xs text-gray-500">
                             <span>{templateId ? 'Düzenleniyor' : 'Taslak'}</span>
                             <span>•</span>
@@ -131,40 +144,56 @@ export const BuilderLayout = ({ sidebar, preview, toolbar, templateId }: Builder
                 </div>
             </div>
 
-            {/* Simple Save Dialog Modal */}
-            {isNameDialogOpen && (
+            {/* Template Settings Dialog */}
+            {isSettingsDialogOpen && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
                     <div className="bg-white rounded-lg shadow-xl w-full max-w-md overflow-hidden animate-in fade-in zoom-in-95 duration-200">
-                        <div className="p-6">
-                            <h2 className="text-lg font-semibold mb-4 text-gray-900">Şablonu Kaydet</h2>
-                            <div className="space-y-4">
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">Şablon Adı</label>
-                                    <input
-                                        type="text"
-                                        value={templateName}
-                                        onChange={(e) => setTemplateName(e.target.value)}
-                                        className="w-full px-3 py-2 border rounded-md text-sm focus:ring-indigo-500 focus:border-indigo-500"
-                                        placeholder="Örn: Müşteri Karşılama"
-                                        autoFocus
-                                    />
-                                </div>
+                        <div className="px-6 py-4 border-b flex justify-between items-center bg-gray-50">
+                            <h2 className="text-lg font-semibold text-gray-900">Şablon Ayarları</h2>
+                            <button onClick={() => setIsSettingsDialogOpen(false)} className="text-gray-500 hover:text-gray-700">
+                                <span className="sr-only">Kapat</span>
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 6L6 18M6 6l12 12" /></svg>
+                            </button>
+                        </div>
+
+                        <div className="p-6 space-y-4">
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Şablon Adı</label>
+                                <input
+                                    type="text"
+                                    value={templateName}
+                                    onChange={(e) => setTemplateName(e.target.value)}
+                                    className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-shadow"
+                                    placeholder="Örn: Müşteri Karşılama"
+                                    autoFocus
+                                />
                             </div>
-                            <div className="mt-6 flex justify-end gap-3">
-                                <button
-                                    onClick={() => setIsNameDialogOpen(false)}
-                                    className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
-                                >
-                                    İptal
-                                </button>
-                                <button
-                                    onClick={handleSaveProcess}
-                                    disabled={!templateName.trim()}
-                                    className="px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 disabled:opacity-50"
-                                >
-                                    Kaydet
-                                </button>
+
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Açıklama</label>
+                                <textarea
+                                    value={templateDescription}
+                                    onChange={(e) => setTemplateDescription(e.target.value)}
+                                    className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-shadow min-h-[80px] resize-none"
+                                    placeholder="Şablonun ne için kullanıldığını açıklayın..."
+                                />
                             </div>
+                        </div>
+
+                        <div className="px-6 py-4 border-t bg-gray-50 flex justify-end gap-3">
+                            <button
+                                onClick={() => setIsSettingsDialogOpen(false)}
+                                className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+                            >
+                                İptal
+                            </button>
+                            <button
+                                onClick={handleSaveProcess}
+                                disabled={!templateName.trim()}
+                                className="px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 disabled:opacity-50 transition-colors"
+                            >
+                                Kaydet
+                            </button>
                         </div>
                     </div>
                 </div>
