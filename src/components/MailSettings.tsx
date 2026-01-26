@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
-import { Mail, Save, AlertCircle, RefreshCw, Send, HelpCircle } from 'lucide-react';
+import { Mail, Save, AlertCircle, RefreshCw, Send, HelpCircle, ExternalLink } from 'lucide-react';
 import { getSetting, updateSetting } from '../services/apiSettings';
 import { toast } from 'sonner';
 
@@ -111,10 +111,20 @@ export function MailSettings() {
                 {/* Sol Kolon: Kritik Ayarlar */}
                 <div className="space-y-4">
                     <div className="space-y-2">
-                        <Label className="flex items-center gap-2">
-                            Resend API Key
-                            <span className="text-xs text-red-500">*</span>
-                        </Label>
+                        <div className="flex items-center justify-between">
+                            <Label className="flex items-center gap-2">
+                                Resend API Key
+                                <span className="text-xs text-red-500">*</span>
+                            </Label>
+                            <a
+                                href="https://resend.com/api-keys"
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-[10px] text-indigo-600 hover:underline flex items-center gap-1"
+                            >
+                                API Anahtarı Al <ExternalLink size={10} />
+                            </a>
+                        </div>
                         <div className="relative">
                             <Input
                                 type="password"
@@ -159,10 +169,20 @@ export function MailSettings() {
                     </div>
 
                     <div className="space-y-2">
-                        <Label className="flex items-center gap-1">
-                            Gönderici Maili
-                            <HelpCircle size={12} className="text-muted-foreground" />
-                        </Label>
+                        <div className="flex items-center justify-between">
+                            <Label className="flex items-center gap-1">
+                                Gönderici Maili
+                                <HelpCircle size={12} className="text-muted-foreground" />
+                            </Label>
+                            <a
+                                href="https://resend.com/domains"
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-[10px] text-indigo-600 hover:underline flex items-center gap-1"
+                            >
+                                Domain Ayarları <ExternalLink size={10} />
+                            </a>
+                        </div>
                         <Input
                             value={fromEmail}
                             onChange={(e) => setFromEmail(e.target.value)}
@@ -170,6 +190,7 @@ export function MailSettings() {
                         />
                         <p className="text-[10px] text-amber-600">
                             Eğer kendi domaininizi doğrulamadıysanız sadece <strong>onboarding@resend.dev</strong> kullanabilirsiniz.
+                            <br />Domain doğrulamak için <a href="https://resend.com/domains" target="_blank" className="underline hover:text-indigo-700">Resend paneline</a> gidin.
                         </p>
                     </div>
                 </div>
