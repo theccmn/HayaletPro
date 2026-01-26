@@ -41,6 +41,7 @@ import {
     DropdownMenuItem,
     DropdownMenuTrigger,
 } from "../components/ui/dropdown-menu";
+import { calculateDuration } from '../lib/utils';
 import {
     AlertDialog,
     AlertDialogAction,
@@ -273,6 +274,20 @@ export default function ProjectDetail() {
                                     )}
                                 </span>
                             </div>
+
+                            {project.start_date && project.end_date && (
+                                <div className="flex justify-between py-2 border-b">
+                                    <span className="text-muted-foreground">Süre</span>
+                                    <span className="font-medium flex items-center gap-1 justify-end">
+                                        {calculateDuration(project.start_date, project.end_date)}
+                                        <span className="text-muted-foreground text-xs font-normal">
+                                            ({new Date(project.start_date).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })}
+                                            {' - '}
+                                            {new Date(project.end_date).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })})
+                                        </span>
+                                    </span>
+                                </div>
+                            )}
 
                             <div className="flex justify-between py-2 border-b">
                                 <span className="text-muted-foreground">Teslim Tarihi</span>

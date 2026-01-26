@@ -11,6 +11,7 @@ import {
     generateWhatsAppLink
 } from './apiWorkflows';
 import { getTemplateById } from './apiTemplates';
+import { calculateDuration } from '../lib/utils';
 import type { Workflow } from '../types/workflow';
 import type { Project } from '../types';
 
@@ -98,37 +99,7 @@ const executeWorkflow = async (workflow: Workflow, context: TriggerContext): Pro
 /**
  * Seans bilgilerini düz metin olarak oluştur (Helper)
  */
-const getPlainTextSessionDetails = (project: Project): string => {
-    const formatDate = (dateStr?: string) => {
-        if (!dateStr) return '-';
-        return new Date(dateStr).toLocaleDateString('tr-TR', {
-            day: 'numeric',
-            month: 'long',
-            year: 'numeric',
-            weekday: 'long'
-        });
-    };
 
-    const formatPrice = (price?: number) => {
-        if (!price) return '-';
-        return new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY' }).format(price);
-    };
-
-    const locationName = project.location_name || project.locations?.name || 'Belirtilmedi';
-
-    let details = `📝 Seans Bilgileri\n------------------\n`;
-    details += `Proje Adı: ${project.title}\n`;
-    details += `Tarih: ${formatDate(project.start_date)}\n`;
-    if (project.start_date) {
-        details += `Saat: ${new Date(project.start_date).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })}\n`;
-    }
-    details += `Konum: ${locationName}\n`;
-    if (project.price) {
-        details += `Tutar: ${formatPrice(project.price)}\n`;
-    }
-
-    return details;
-};
 
 /**
  * E-posta bildirimi gönder
@@ -421,7 +392,10 @@ const renderTemplate = async (blocks: any[], project: Project): Promise<{ html: 
             // Verileri hazırla
             const sessionType = project.project_types?.label || '-';
             // @ts-ignore - duration veritabanında olabilir
-            const duration = project.project_types?.duration ? `${project.project_types.duration} dakika` : '-';
+            const duration = (project.start_date && project.end_date)
+                ? calculateDuration(project.start_date, project.end_date)
+                : '-';
+
             // Paket adı logic: details içinde "Paket: X" formatında olabilir veya direkt details
             const packageName = project.details || '-';
 

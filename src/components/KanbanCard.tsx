@@ -1,6 +1,6 @@
 import { Draggable } from '@hello-pangea/dnd';
 import { useNavigate } from 'react-router-dom';
-import { cn } from '../lib/utils';
+import { cn, calculateDuration } from '../lib/utils';
 import type { Project, Transaction } from '../types';
 import { Calendar, MoreVertical, Pencil, Trash2, Wallet, Eye, CheckCircle2 } from 'lucide-react';
 import { format } from 'date-fns';
@@ -133,8 +133,15 @@ export function KanbanCard({ project, index, transactions, onEdit, onDelete, onA
                         <h4 className="font-semibold text-sm leading-tight">{project.title}</h4>
 
                         <div className="flex items-center text-xs text-muted-foreground mt-2 pt-2 border-t border-border/50">
-                            <Calendar className="mr-1 h-3 w-3" />
-                            {project.start_date ? format(new Date(project.start_date), 'd MMM', { locale: tr }) : '-'}
+                            <Calendar className="mr-1 h-3 w-3 shrink-0" />
+                            <span className="truncate max-w-[120px]">
+                                {project.start_date ? format(new Date(project.start_date), 'd MMM', { locale: tr }) : '-'}
+                                {project.start_date && project.end_date && (
+                                    <span className="ml-1 opacity-70">
+                                        ({calculateDuration(project.start_date, project.end_date)})
+                                    </span>
+                                )}
+                            </span>
                             <div className="ml-auto font-medium text-foreground">
                                 {project.price ? `₺${project.price.toLocaleString('tr-TR')}` : '₺0'}
                             </div>

@@ -4,7 +4,7 @@ import type { Project } from '../types';
 import { Plus, LayoutGrid, List as ListIcon, Loader2, Calendar, MoreVertical, Pencil, Trash2, Eye, EyeOff, ArrowUpDown, ArrowUp, ArrowDown, Wallet, Settings2, Kanban as KanbanIcon, CheckCircle2, ZoomIn, ZoomOut, Clock, Search, AlertTriangle, Tag, Map, MapPin } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { useState } from 'react';
-import { cn } from '../lib/utils';
+import { cn, calculateDuration } from '../lib/utils';
 import { format } from 'date-fns';
 import { tr } from 'date-fns/locale';
 import { ProjectDialog } from '../components/ProjectDialog';
@@ -637,9 +637,16 @@ export default function Projects() {
                                             </div>
 
                                             <div className="flex items-center justify-between text-sm mt-auto">
-                                                <div className="flex items-center text-muted-foreground">
+                                                <div className="flex items-center text-muted-foreground text-xs">
                                                     <Calendar className="mr-1 h-3.5 w-3.5" />
-                                                    {project.start_date ? format(new Date(project.start_date), 'd MMM yyyy', { locale: tr }) : '-'}
+                                                    <span>
+                                                        {project.start_date ? format(new Date(project.start_date), 'd MMM yyyy', { locale: tr }) : '-'}
+                                                        {project.start_date && project.end_date && (
+                                                            <span className="ml-1 text-muted-foreground/70">
+                                                                ({calculateDuration(project.start_date, project.end_date)})
+                                                            </span>
+                                                        )}
+                                                    </span>
                                                 </div>
                                                 <div className="font-medium">
                                                     {project.price ? `₺${project.price.toLocaleString('tr-TR')}` : '₺0'}
@@ -797,9 +804,16 @@ export default function Projects() {
                                         </div>
 
                                         {/* Date/Price */}
-                                        <div className="hidden md:flex items-center text-sm text-muted-foreground w-32">
-                                            <Calendar className="mr-1 h-3.5 w-3.5" />
-                                            {project.start_date ? format(new Date(project.start_date), 'd MMM yyyy', { locale: tr }) : '-'}
+                                        <div className="hidden md:flex items-center text-sm text-muted-foreground w-48">
+                                            <Calendar className="mr-1 h-3.5 w-3.5 shrink-0" />
+                                            <span className="truncate">
+                                                {project.start_date ? format(new Date(project.start_date), 'd MMM yyyy', { locale: tr }) : '-'}
+                                                {project.start_date && project.end_date && (
+                                                    <span className="ml-1 text-muted-foreground/70">
+                                                        ({calculateDuration(project.start_date, project.end_date)})
+                                                    </span>
+                                                )}
+                                            </span>
                                         </div>
                                         <div className="hidden md:block font-medium w-24 text-right">
                                             {project.price ? `₺${project.price.toLocaleString('tr-TR')}` : '₺0'}

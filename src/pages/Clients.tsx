@@ -441,11 +441,17 @@ export default function Clients() {
                                             </Button>
                                         </DropdownMenuTrigger>
                                         <DropdownMenuContent align="end">
-                                            <DropdownMenuItem onClick={() => handleEditClick(client)}>
+                                            <DropdownMenuItem onClick={(e) => {
+                                                e.stopPropagation();
+                                                handleEditClick(client);
+                                            }}>
                                                 <Pencil className="mr-2 h-4 w-4" /> Düzenle
                                             </DropdownMenuItem>
                                             <DropdownMenuItem
-                                                onClick={() => handleDeleteClick(client)}
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    handleDeleteClick(client);
+                                                }}
                                                 className="text-red-600 focus:text-red-600 focus:bg-red-50"
                                             >
                                                 <Trash2 className="mr-2 h-4 w-4" /> Sil
