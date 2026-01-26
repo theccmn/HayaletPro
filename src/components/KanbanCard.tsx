@@ -147,6 +147,16 @@ export function KanbanCard({ project, index, transactions, onEdit, onDelete, onA
                             </div>
                         </div>
                     </div>
+                    {(() => {
+                        // @ts-ignore
+                        const locType = Array.isArray(project.location_types) ? project.location_types[0] : project.location_types;
+                        if (!locType) return null;
+                        return (
+                            <div className={cn("w-full px-3 py-1 text-[9px] font-bold uppercase tracking-widest text-center border-t", locType.color)}>
+                                {locType.label}
+                            </div>
+                        );
+                    })()}
                 </div>
             )}
         </Draggable>
