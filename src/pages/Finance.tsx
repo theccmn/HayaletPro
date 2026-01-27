@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { getTransactions, deleteTransaction } from '../services/apiFinance';
+import { getTransactions, deleteTransaction, getFinanceSettings } from '../services/apiFinance';
 import { Loader2, Plus, TrendingDown, TrendingUp, Wallet, Settings, Trash2, Search, ArrowUpDown, ArrowUp, ArrowDown, Download, X, Calendar } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -21,7 +21,7 @@ import {
     AlertDialogTitle,
 } from '../components/ui/alert-dialog';
 
-type SortColumn = 'title' | 'category' | 'type' | 'project' | 'date' | 'amount';
+type SortColumn = 'title' | 'category' | 'type' | 'project' | 'date' | 'amount' | 'payment_method';
 type SortDirection = 'asc' | 'desc';
 type PeriodMode = 'daily' | 'weekly' | 'monthly' | 'yearly' | 'custom';
 
@@ -40,6 +40,7 @@ export default function Finance() {
     const [searchQuery, setSearchQuery] = useState('');
     const [projectFilter, setProjectFilter] = useState<string>('all');
     const [categoryFilter, setCategoryFilter] = useState<string>('all');
+    const [paymentMethodFilter, setPaymentMethodFilter] = useState<string>('all');
 
     // Akıllı tarih seçici
     const [periodMode, setPeriodMode] = useState<PeriodMode>('daily');
@@ -55,6 +56,11 @@ export default function Finance() {
     const { data: transactions, isLoading } = useQuery({
         queryKey: ['transactions'],
         queryFn: () => getTransactions(),
+    });
+
+    const { data: paymentMethods } = useQuery({
+        queryKey: ['settings', 'payment_method'],
+        queryFn: () => getFinanceSettings('payment_method'),
     });
 
     const deleteMutation = useMutation({
@@ -174,9 +180,14 @@ export default function Finance() {
                 if (t.category !== categoryFilter) return false;
             }
 
+            // 6. Gelir Şekli (Ödeme Yöntemi) Filtresi
+            if (paymentMethodFilter !== 'all') {
+                if (t.payment_method !== paymentMethodFilter) return false;
+            }
+
             return true;
         });
-    }, [transactions, getDateRange, typeFilter, searchQuery, projectFilter, categoryFilter]);
+    }, [transactions, getDateRange, typeFilter, searchQuery, projectFilter, categoryFilter, paymentMethodFilter]);
 
     // Sıralama mantığı
     const sortedTransactions = useMemo(() => {
@@ -203,6 +214,9 @@ export default function Finance() {
                     break;
                 case 'amount':
                     comparison = (a.amount || 0) - (b.amount || 0);
+                    break;
+                case 'payment_method':
+                    comparison = (a.payment_method || '').localeCompare(b.payment_method || '');
                     break;
             }
 
@@ -235,6 +249,7 @@ export default function Finance() {
         setSearchQuery('');
         setProjectFilter('all');
         setCategoryFilter('all');
+        setPaymentMethodFilter('all');
         setTypeFilter('all');
         setPeriodMode('daily');
         setSelectedMonth(new Date().getMonth());
@@ -243,17 +258,18 @@ export default function Finance() {
         setDateRangeEnd('');
     };
 
-    const hasActiveFilters = searchQuery || projectFilter !== 'all' || categoryFilter !== 'all' || typeFilter !== 'all';
+    const hasActiveFilters = searchQuery || projectFilter !== 'all' || categoryFilter !== 'all' || typeFilter !== 'all' || paymentMethodFilter !== 'all';
 
     // CSV Export - Türkçe Excel için noktalı virgül
     const exportToCSV = () => {
         if (!sortedTransactions.length) return;
 
-        const headers = ['İşlem', 'Kategori', 'Tür', 'Proje', 'Tarih', 'Tutar'];
+        const headers = ['İşlem', 'Kategori', 'Tür', 'Gelir Şekli', 'Proje', 'Tarih', 'Tutar'];
         const rows = sortedTransactions.map(t => [
             t.title || '',
             t.category || '',
             t.type === 'income' ? 'Gelir' : 'Gider',
+            t.payment_method || '-',
             t.projects?.title || '-',
             format(new Date(t.date), 'd MMM yyyy HH:mm', { locale: tr }),
             t.type === 'income' ? t.amount : -t.amount
@@ -417,6 +433,16 @@ export default function Finance() {
                                 <option key={c} value={c}>{c}</option>
                             ))}
                         </select>
+                        <select
+                            value={paymentMethodFilter}
+                            onChange={(e) => setPaymentMethodFilter(e.target.value)}
+                            className="h-10 rounded-md border border-input bg-background px-3 py-2 text-sm min-w-[150px]"
+                        >
+                            <option value="all">Tüm Gelir Şekilleri</option>
+                            {paymentMethods?.map(pm => (
+                                <option key={pm.id} value={pm.label}>{pm.label}</option>
+                            ))}
+                        </select>
                     </div>
 
                     {/* Row 2: Date Selector + Type Filter */}
@@ -575,6 +601,14 @@ export default function Finance() {
                                 </th>
                                 <th
                                     className="h-12 px-4 align-middle font-medium text-muted-foreground cursor-pointer hover:text-foreground transition-colors"
+                                    onClick={() => handleSort('payment_method')}
+                                >
+                                    <div className="flex items-center">
+                                        Gelir Şekli <SortIcon column="payment_method" />
+                                    </div>
+                                </th>
+                                <th
+                                    className="h-12 px-4 align-middle font-medium text-muted-foreground cursor-pointer hover:text-foreground transition-colors"
                                     onClick={() => handleSort('project')}
                                 >
                                     <div className="flex items-center">
@@ -603,7 +637,7 @@ export default function Finance() {
                         <tbody className="[&_tr:last-child]:border-0">
                             {sortedTransactions.length === 0 ? (
                                 <tr>
-                                    <td colSpan={7} className="p-8 text-center text-muted-foreground">
+                                    <td colSpan={8} className="p-8 text-center text-muted-foreground">
                                         <div className="flex flex-col items-center gap-2">
                                             <Search className="h-8 w-8 opacity-50" />
                                             <p>Aramanızla eşleşen kayıt bulunamadı.</p>
@@ -632,6 +666,9 @@ export default function Finance() {
                                         )}>
                                             {transaction.type === 'income' ? 'Gelir' : 'Gider'}
                                         </span>
+                                    </td>
+                                    <td className="p-4 align-middle text-muted-foreground">
+                                        {transaction.payment_method || '-'}
                                     </td>
                                     <td className="p-4 align-middle text-muted-foreground">
                                         {transaction.projects?.title || '-'}
