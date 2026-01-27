@@ -27,9 +27,16 @@ export const getTransactions = async (projectId?: string): Promise<Transaction[]
 };
 
 export const createTransaction = async (transaction: NewTransaction): Promise<Transaction> => {
+    // Get current user for RLS - Removed as user_id column doesn't exist
+    // const { data: { user } } = await supabase.auth.getUser();
+
+    const newTransaction = {
+        ...transaction
+    };
+
     const { data, error } = await supabase
         .from('transactions')
-        .insert([transaction])
+        .insert([newTransaction])
         .select()
         .single();
 
@@ -67,10 +74,21 @@ export const deleteTransaction = async (id: string): Promise<void> => {
         console.error('Error deleting transaction:', error);
         throw error;
     }
+};
+
+export const createBulkTransactions = async (transactions: NewTransaction[]): Promise<Transaction[] | null> => {
+    // Get current user for RLS
+    const { data, error } = await supabase
+        .from('transactions')
+        .insert(transactions)
+        .select();
+
     if (error) {
-        console.error('Error deleting transaction:', error);
+        console.error('Error creating bulk transactions:', error);
         throw error;
     }
+
+    return data;
 };
 
 // --- Finance Settings API ---

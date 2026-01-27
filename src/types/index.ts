@@ -61,6 +61,7 @@ export interface Transaction {
     category: string;
     type: 'income' | 'expense';
     payment_method?: string;
+    user_id?: string;
     date: string;
     project_id?: string | null;
     job_date?: string;

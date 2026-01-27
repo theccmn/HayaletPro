@@ -8,6 +8,7 @@ import { tr } from 'date-fns/locale';
 import { useState, useMemo } from 'react';
 import { cn } from '../lib/utils';
 import { TransactionDialog } from '../components/TransactionDialog';
+import { TransactionImportDialog } from '../components/TransactionImportDialog';
 import { FinanceCharts } from '../components/FinanceCharts';
 import { FinanceSettingsDialog } from '../components/FinanceSettingsDialog';
 import {
@@ -27,11 +28,11 @@ type PeriodMode = 'daily' | 'weekly' | 'monthly' | 'yearly' | 'custom';
 
 const MONTHS = ['Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran', 'Temmuz', 'Ağustos', 'Eylül', 'Ekim', 'Kasım', 'Aralık'];
 const CURRENT_YEAR = new Date().getFullYear();
-const YEARS = Array.from({ length: CURRENT_YEAR - 2019 }, (_, i) => 2020 + i);
 
 export default function Finance() {
     const queryClient = useQueryClient();
     const [isDialogOpen, setIsDialogOpen] = useState(false);
+    const [isImportDialogOpen, setIsImportDialogOpen] = useState(false);
     const [isSettingsOpen, setIsSettingsOpen] = useState(false);
     const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
 
@@ -43,7 +44,7 @@ export default function Finance() {
     const [paymentMethodFilter, setPaymentMethodFilter] = useState<string>('all');
 
     // Akıllı tarih seçici
-    const [periodMode, setPeriodMode] = useState<PeriodMode>('daily');
+    const [periodMode, setPeriodMode] = useState<PeriodMode>('monthly');
     const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth()); // 0-11
     const [selectedYear, setSelectedYear] = useState(CURRENT_YEAR);
     const [dateRangeStart, setDateRangeStart] = useState<string>('');
@@ -55,8 +56,16 @@ export default function Finance() {
 
     const { data: transactions, isLoading } = useQuery({
         queryKey: ['transactions'],
-        queryFn: () => getTransactions(),
+        queryFn: getTransactions,
     });
+
+    // DEBUG: Veri kontrolü
+    if (transactions) {
+        console.log("🔥 Loaded Transactions:", transactions.length);
+        console.log("🔥 Sample:", transactions.slice(0, 3));
+        const currentYearData = transactions.filter(t => t.date.startsWith(String(selectedYear)));
+        console.log(`🔥 Transactions for ${selectedYear}:`, currentYearData.length);
+    }
 
     const { data: paymentMethods } = useQuery({
         queryKey: ['settings', 'payment_method'],
@@ -84,6 +93,20 @@ export default function Finance() {
             ?.map(t => t.category)
             .filter((cat): cat is string => !!cat);
         return [...new Set(categories)].sort();
+    }, [transactions]);
+
+    // Yılları dinamik olarak hesapla
+    const years = useMemo(() => {
+        const currentYear = new Date().getFullYear();
+        let minYear = 2020;
+
+        if (transactions && transactions.length > 0) {
+            const transactionYears = transactions.map(t => new Date(t.date).getFullYear());
+            minYear = Math.min(...transactionYears);
+            if (minYear > 2020) minYear = 2020;
+        }
+
+        return Array.from({ length: currentYear - minYear + 1 }, (_, i) => currentYear - i);
     }, [transactions]);
 
     // Tarih aralığı hesaplama
@@ -338,6 +361,9 @@ export default function Finance() {
                     <Button variant="outline" onClick={() => setIsSettingsOpen(true)}>
                         <Settings className="mr-2 h-4 w-4" /> Ayarlar
                     </Button>
+                    <Button variant="outline" onClick={() => setIsImportDialogOpen(true)}>
+                        <Download className="mr-2 h-4 w-4 rotate-180" /> İçe Aktar
+                    </Button>
                     <Button onClick={() => setIsDialogOpen(true)} className="bg-primary text-primary-foreground hover:bg-primary/90">
                         <Plus className="mr-2 h-4 w-4" /> Yeni İşlem Ekle
                     </Button>
@@ -500,6 +526,8 @@ export default function Finance() {
                                 </select>
                             )}
 
+
+
                             {/* Year Selector (for monthly and yearly modes) */}
                             {(periodMode === 'monthly' || periodMode === 'yearly') && (
                                 <select
@@ -512,9 +540,9 @@ export default function Finance() {
                                             setSelectedMonth(new Date().getMonth());
                                         }
                                     }}
-                                    className="h-8 rounded-md border border-input bg-background px-2 py-1 text-sm"
+                                    className="h-8 rounded-md border border-input bg-background px-2 py-1 text-sm focus:ring-2 focus:ring-ring focus:outline-none"
                                 >
-                                    {YEARS.map(year => (
+                                    {years.map(year => (
                                         <option key={year} value={year}>{year}</option>
                                     ))}
                                 </select>
@@ -522,19 +550,19 @@ export default function Finance() {
 
                             {/* Custom Date Range (only for custom mode) */}
                             {periodMode === 'custom' && (
-                                <div className="flex items-center gap-2 bg-background rounded-md border px-2 py-1">
+                                <div className="flex items-center gap-2">
                                     <Input
                                         type="date"
                                         value={dateRangeStart}
                                         onChange={(e) => setDateRangeStart(e.target.value)}
-                                        className="border-0 p-0 h-6 w-28 focus-visible:ring-0 text-sm"
+                                        className="h-8 w-auto min-w-[130px] text-sm"
                                     />
                                     <span className="text-muted-foreground text-sm">-</span>
                                     <Input
                                         type="date"
                                         value={dateRangeEnd}
                                         onChange={(e) => setDateRangeEnd(e.target.value)}
-                                        className="border-0 p-0 h-6 w-28 focus-visible:ring-0 text-sm"
+                                        className="h-8 w-auto min-w-[130px] text-sm"
                                     />
                                 </div>
                             )}
@@ -700,6 +728,7 @@ export default function Finance() {
             </div>
 
             <TransactionDialog isOpen={isDialogOpen} onClose={() => setIsDialogOpen(false)} />
+            <TransactionImportDialog isOpen={isImportDialogOpen} onClose={() => setIsImportDialogOpen(false)} />
             <FinanceSettingsDialog isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} />
 
             {/* Delete Confirmation Dialog */}
