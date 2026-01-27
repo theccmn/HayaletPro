@@ -3,8 +3,8 @@ import { Dialog } from './ui/dialog';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { createInventoryItem, updateInventoryItem } from '../services/apiInventory';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { createInventoryItem, updateInventoryItem, getCategories } from '../services/apiInventory';
 import type { InventoryItem, NewInventoryItem } from '../types';
 import { useEffect } from 'react';
 import { Loader2 } from 'lucide-react';
@@ -15,31 +15,36 @@ interface InventoryDialogProps {
     itemToEdit?: InventoryItem | null;
 }
 
-const CATEGORIES = ['Kamera', 'Lens', 'Işık', 'Ses', 'Aksesuar', 'Bilgisayar', 'Diğer'];
-const STATUSES = [
-    { value: 'available', label: 'Ofiste (Müsait)' },
-    { value: 'rented', label: 'Kirada / Projede' },
-    { value: 'maintenance', label: 'Bakımda' },
-    { value: 'lost', label: 'Kayıp / Çalıntı' },
-];
-
 export function InventoryDialog({ isOpen, onClose, itemToEdit }: InventoryDialogProps) {
     const queryClient = useQueryClient();
     const isEditMode = !!itemToEdit;
 
-    const { register, handleSubmit, reset, setValue } = useForm<NewInventoryItem>({
+    // Fetch categories
+    const { data: categories = [] } = useQuery({
+        queryKey: ['inventory-categories'],
+        queryFn: getCategories,
+    });
+
+    const { register, handleSubmit, reset, setValue, watch } = useForm<NewInventoryItem>({
         defaultValues: {
             name: '',
-            category: 'Kamera',
+            category: '',
             brand: '',
             model: '',
             serial_number: '',
             purchase_date: '',
             price: 0,
-            status: 'available',
+            status: 'available', // Default to available
             notes: ''
         }
     });
+
+    // Set default category when categories load
+    useEffect(() => {
+        if (categories.length > 0 && !watch('category')) {
+            setValue('category', categories[0].name);
+        }
+    }, [categories, setValue, watch]);
 
     useEffect(() => {
         if (isOpen) {
@@ -51,12 +56,13 @@ export function InventoryDialog({ isOpen, onClose, itemToEdit }: InventoryDialog
                 setValue('serial_number', itemToEdit.serial_number || '');
                 setValue('purchase_date', itemToEdit.purchase_date || '');
                 setValue('price', itemToEdit.price);
+                // Status is hidden but we keep it in data
                 setValue('status', itemToEdit.status);
                 setValue('notes', itemToEdit.notes || '');
             } else {
                 reset({
                     name: '',
-                    category: 'Kamera',
+                    category: categories.length > 0 ? categories[0].name : '',
                     brand: '',
                     model: '',
                     serial_number: '',
@@ -67,7 +73,7 @@ export function InventoryDialog({ isOpen, onClose, itemToEdit }: InventoryDialog
                 });
             }
         }
-    }, [isOpen, itemToEdit, setValue, reset]);
+    }, [isOpen, itemToEdit, setValue, reset, categories]);
 
     const mutation = useMutation({
         mutationFn: (data: NewInventoryItem) => {
@@ -103,10 +109,10 @@ export function InventoryDialog({ isOpen, onClose, itemToEdit }: InventoryDialog
                     <div className="grid gap-2">
                         <Label>Kategori</Label>
                         <select
-                            {...register('category')}
+                            {...register('category', { required: true })}
                             className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
                         >
-                            {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+                            {categories.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
                         </select>
                     </div>
                     <div className="grid gap-2">
@@ -137,15 +143,7 @@ export function InventoryDialog({ isOpen, onClose, itemToEdit }: InventoryDialog
                     </div>
                 </div>
 
-                <div className="grid gap-2">
-                    <Label>Durum</Label>
-                    <select
-                        {...register('status')}
-                        className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                    >
-                        {STATUSES.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
-                    </select>
-                </div>
+                {/* Status field removed as requested */}
 
                 <div className="grid gap-2">
                     <Label>Notlar</Label>

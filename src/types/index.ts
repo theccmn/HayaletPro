@@ -162,3 +162,19 @@ export interface Task {
 }
 
 export type NewTask = Omit<Task, 'id' | 'created_at' | 'projects'>;
+export interface InventoryCategory {
+    id: string;
+    name: string;
+    order_index: number;
+    created_at?: string;
+}
+
+export interface ProjectInventoryItem {
+    id: string;
+    project_id: string;
+    inventory_item_id: string;
+    quantity: number;
+    notes?: string;
+    created_at?: string;
+    inventory_item?: InventoryItem; // Joined data
+}

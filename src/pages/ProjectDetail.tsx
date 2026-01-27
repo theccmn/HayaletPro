@@ -35,6 +35,7 @@ import { PaymentDetailsDialog } from '../components/PaymentDetailsDialog';
 import { TransactionDialog } from '../components/TransactionDialog';
 import { SelectionManagerDialog } from '../components/SelectionManagerDialog';
 import { ProjectTodoList } from '../components/ProjectTodoList';
+import { ProjectInventoryManager } from '../components/projects/ProjectInventoryManager';
 import type { Transaction } from '../types';
 import {
     DropdownMenu,
@@ -587,6 +588,11 @@ export default function ProjectDetail() {
                     {/* Todo List */}
                     <div className="h-[500px]">
                         <ProjectTodoList projectId={project.id} />
+                    </div>
+
+                    {/* Inventory Manager */}
+                    <div className="border rounded-xl bg-card/80 backdrop-blur-sm shadow-sm p-5">
+                        <ProjectInventoryManager projectId={project.id} projectTitle={project.title} />
                     </div>
                 </div>
             </div>
