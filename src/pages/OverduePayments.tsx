@@ -5,13 +5,17 @@ import { getUpcomingPayments } from '../utils/dateFilters';
 import type { PaymentInfo } from '../utils/dateFilters';
 import { ArrowLeft, AlertTriangle, Clock, ExternalLink } from 'lucide-react';
 import { Button } from '../components/ui/button';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { format, parseISO, differenceInDays } from 'date-fns';
 import { tr } from 'date-fns/locale';
 import { cn } from '../lib/utils';
+import type { TimeFilter } from '../utils/dateFilters';
 
 export default function OverduePayments() {
     const navigate = useNavigate();
+    const [searchParams] = useSearchParams();
+    const filterParam = searchParams.get('filter') as TimeFilter;
+    const activeFilter: TimeFilter = ['day', 'week', 'month', 'year', 'all'].includes(filterParam) ? filterParam : 'all';
 
     const { data: projects } = useQuery({
         queryKey: ['projects'],
@@ -24,7 +28,7 @@ export default function OverduePayments() {
     });
 
     const allPayments = projects && transactions
-        ? getUpcomingPayments(projects, transactions, 'all')
+        ? getUpcomingPayments(projects, transactions, activeFilter)
         : [];
 
     const overduePayments = allPayments.filter((p) => p.isOverdue);

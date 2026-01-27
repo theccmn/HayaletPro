@@ -115,7 +115,7 @@ export default function Dashboard() {
                     warningText={hasOverduePayments ? 'Aksiyon gerekli' : undefined}
                     suffix={hasOverduePayments ? 'gecikmiş' : 'yaklaşan'}
                     isClickable={true}
-                    onClick={() => navigate('/overdue-payments')}
+                    onClick={() => navigate(`/overdue-payments?filter=${odemeFilter}`)}
                 />
 
                 {/* Proje */}
