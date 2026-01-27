@@ -2,6 +2,7 @@ import { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { getProjects } from '../../services/apiProjects';
 import { getTransactions } from '../../services/apiFinance';
+import { getReminders } from '../../services/apiTasks';
 import {
     format,
     startOfWeek,
@@ -23,8 +24,9 @@ interface CalendarEvent {
     id: string;
     title: string;
     date: Date;
-    type: 'project' | 'job';
+    type: 'project' | 'job' | 'reminder';
     time?: string;
+    projectId?: string;
 }
 
 export function DashboardCalendar() {
@@ -39,6 +41,11 @@ export function DashboardCalendar() {
     const { data: transactions } = useQuery({
         queryKey: ['transactions'],
         queryFn: () => getTransactions(),
+    });
+
+    const { data: reminders } = useQuery({
+        queryKey: ['reminders'],
+        queryFn: getReminders,
     });
 
     // Process events
@@ -88,8 +95,25 @@ export function DashboardCalendar() {
             }
         });
 
-        return allEvents;
-    }, [projects, transactions]);
+        // Reminders
+        reminders?.forEach((r) => {
+            if (r.reminder_date) {
+                const dateObj = new Date(r.reminder_date);
+                if (!isNaN(dateObj.getTime())) {
+                    allEvents.push({
+                        id: r.id,
+                        title: `[Hatırlatma] ${r.projects?.title || 'Projesiz'}: ${r.content}`,
+                        date: dateObj,
+                        type: 'reminder',
+                        time: format(dateObj, 'HH:mm'),
+                        projectId: r.project_id
+                    });
+                }
+            }
+        });
+
+        return allEvents.sort((a, b) => a.date.getTime() - b.date.getTime());
+    }, [projects, transactions, reminders]);
 
     // Get events for display
     const displayEvents = useMemo(() => {
@@ -206,18 +230,20 @@ export function DashboardCalendar() {
                     displayEvents.map((event) => (
                         <Link
                             key={event.id}
-                            to={event.type === 'project' ? `/projects/${event.id}` : '/calendar'}
+                            to={event.type === 'project' ? `/projects/${event.id}` : event.type === 'reminder' && event.projectId ? `/projects/${event.projectId}` : '/calendar'}
                             className={cn(
                                 'flex items-center gap-2 p-2 rounded-lg border text-sm transition-all hover:shadow-sm',
                                 event.type === 'project'
                                     ? 'bg-blue-50 border-blue-200 hover:bg-blue-100'
-                                    : 'bg-green-50 border-green-200 hover:bg-green-100'
+                                    : event.type === 'job'
+                                        ? 'bg-green-50 border-green-200 hover:bg-green-100'
+                                        : 'bg-amber-50 border-amber-200 hover:bg-amber-100'
                             )}
                         >
                             <div
                                 className={cn(
                                     'h-2 w-2 rounded-full',
-                                    event.type === 'project' ? 'bg-blue-500' : 'bg-green-500'
+                                    event.type === 'project' ? 'bg-blue-500' : event.type === 'job' ? 'bg-green-500' : 'bg-amber-500'
                                 )}
                             />
                             <div className="flex-1 min-w-0">

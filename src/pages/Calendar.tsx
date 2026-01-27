@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { getProjects } from '../services/apiProjects';
 import { getStatuses } from '../services/apiStatuses';
 import { getTransactions } from '../services/apiFinance';
+import { getReminders } from '../services/apiTasks';
 import {
     format, startOfMonth, endOfMonth, startOfWeek, endOfWeek,
     eachDayOfInterval, isSameMonth, isSameDay, addMonths, subMonths,
@@ -39,7 +40,7 @@ interface CalendarEvent {
     date: Date;
     color: string;
     textColor: string;
-    type: 'project' | 'job';
+    type: 'project' | 'job' | 'reminder';
     time?: string;
 }
 
@@ -51,6 +52,7 @@ export default function Calendar() {
     const { data: projects } = useQuery({ queryKey: ['projects'], queryFn: getProjects });
     const { data: statuses } = useQuery({ queryKey: ['statuses'], queryFn: getStatuses });
     const { data: transactions } = useQuery({ queryKey: ['transactions'], queryFn: () => getTransactions() });
+    const { data: reminders } = useQuery({ queryKey: ['reminders'], queryFn: getReminders });
 
     // Process Events
     const events = useMemo(() => {
@@ -117,8 +119,27 @@ export default function Calendar() {
             }
         });
 
+        // 3. Reminders
+        reminders?.forEach(r => {
+            if (r.reminder_date) {
+                const dateObj = new Date(r.reminder_date);
+                if (!isNaN(dateObj.getTime())) {
+                    const bg = '#f59e0b'; // Amber-500 equivalent
+                    allEvents.push({
+                        id: r.id,
+                        title: `[Hatırlatma] ${r.content}`,
+                        date: dateObj,
+                        color: bg,
+                        textColor: '#ffffff',
+                        type: 'reminder',
+                        time: format(dateObj, 'HH:mm')
+                    });
+                }
+            }
+        });
+
         return allEvents;
-    }, [projects, statuses, transactions]);
+    }, [projects, statuses, transactions, reminders]);
 
     // Navigation Logic
     const next = () => {

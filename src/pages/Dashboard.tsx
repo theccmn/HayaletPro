@@ -12,6 +12,7 @@ import { useNavigate } from 'react-router-dom';
 import { useState } from 'react';
 import { TransactionDialog } from '../components/TransactionDialog';
 import { StatCard } from '../components/dashboard/StatCard';
+import { RemindersCard } from '../components/dashboard/RemindersCard';
 import { DashboardCalendar } from '../components/dashboard/DashboardCalendar';
 import { DashboardIncomeChart } from '../components/dashboard/DashboardIncomeChart';
 import type { TimeFilter } from '../utils/dateFilters';
@@ -78,7 +79,7 @@ export default function Dashboard() {
             </div>
 
             {/* Stat Cards */}
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
                 {/* Net Kasa */}
                 <StatCard
                     title="Net Kasa"
@@ -132,6 +133,9 @@ export default function Dashboard() {
                     onClick={() => navigate(`/projects?timeFilter=${projeFilter}`)}
                     isClickable={true}
                 />
+
+                {/* Hatırlatıcılar */}
+                <RemindersCard />
             </div>
 
             {/* Bottom Section: Calendar + Income Chart */}

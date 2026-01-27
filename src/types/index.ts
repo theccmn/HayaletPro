@@ -147,3 +147,17 @@ export interface Installment {
 }
 
 export type NewInstallment = Omit<Installment, 'id' | 'created_at' | 'status'>;
+
+export interface Task {
+    id: string;
+    project_id: string;
+    content: string;
+    is_completed: boolean;
+    reminder_date?: string;
+    created_at?: string;
+    projects?: {
+        title: string;
+    };
+}
+
+export type NewTask = Omit<Task, 'id' | 'created_at' | 'projects'>;

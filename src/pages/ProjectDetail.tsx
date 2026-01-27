@@ -34,6 +34,7 @@ import { ProjectDialog } from '../components/ProjectDialog';
 import { PaymentDetailsDialog } from '../components/PaymentDetailsDialog';
 import { TransactionDialog } from '../components/TransactionDialog';
 import { SelectionManagerDialog } from '../components/SelectionManagerDialog';
+import { ProjectTodoList } from '../components/ProjectTodoList';
 import type { Transaction } from '../types';
 import {
     DropdownMenu,
@@ -581,6 +582,11 @@ export default function ProjectDetail() {
                                 </div>
                             )}
                         </div>
+                    </div>
+
+                    {/* Todo List */}
+                    <div className="h-[500px]">
+                        <ProjectTodoList projectId={project.id} />
                     </div>
                 </div>
             </div>
