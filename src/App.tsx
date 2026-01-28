@@ -6,6 +6,7 @@ import Dashboard from './pages/Dashboard';
 import Clients from './pages/Clients';
 import ClientDetail from './pages/ClientDetail';
 import Inventory from './pages/Inventory';
+import FaceRecognition from './pages/FaceRecognition';
 import Settings from './pages/Settings';
 import Login from './pages/Login';
 import { ClientSelectionView } from './pages/ClientSelectionView';
@@ -49,6 +50,7 @@ function App() {
                 <Route path="clients" element={<Clients />} />
                 <Route path="clients/:id" element={<ClientDetail />} />
                 <Route path="inventory" element={<Inventory />} />
+                <Route path="face-recognition" element={<FaceRecognition />} />
                 <Route path="workflows" element={<Workflows />} />
                 <Route path="settings" element={<Settings />} />
                 <Route path="overdue-payments" element={<OverduePayments />} />

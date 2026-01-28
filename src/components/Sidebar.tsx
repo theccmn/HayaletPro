@@ -11,6 +11,7 @@ import {
     LogOut,
     UserCircle,
     Ghost,
+    ScanFace,
     Workflow
 } from 'lucide-react';
 import { cn } from '../lib/utils';
@@ -33,6 +34,7 @@ const Sidebar = () => {
         { icon: Calendar, label: 'Takvim', path: '/calendar' },
         { icon: Users, label: 'Müşteriler', path: '/clients' },
         { icon: Package, label: 'Envanter', path: '/inventory' },
+        { icon: ScanFace, label: 'Yüz Tanıma', path: '/face-recognition' },
         { icon: Workflow, label: 'İş Akışları', path: '/workflows' },
         { icon: Settings, label: 'Ayarlar', path: '/settings' },
     ];

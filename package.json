@@ -28,6 +28,7 @@
     "clsx": "^2.1.1",
     "date-fns": "^4.1.0",
     "emoji-picker-react": "^4.17.1",
+    "face-api.js": "^0.22.2",
     "file-saver": "^2.0.5",
     "framer-motion": "^11.18.2",
     "jszip": "^3.10.1",
