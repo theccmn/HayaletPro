@@ -65,6 +65,7 @@ export interface Transaction {
     date: string;
     project_id?: string | null;
     job_date?: string;
+    description?: string; // Eklenen alan: Notlar/Açıklama için
     created_at?: string;
     projects?: {
         title: string;

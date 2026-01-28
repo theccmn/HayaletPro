@@ -13,6 +13,8 @@ import { tr } from 'date-fns/locale';
 import { Button } from '../components/ui/button';
 import { ChevronLeft, ChevronRight, Clock } from 'lucide-react';
 import { cn } from '../lib/utils';
+import { useNavigate } from 'react-router-dom';
+import { DeliveryDetailDialog } from '../components/DeliveryDetailDialog';
 
 type ViewMode = 'month' | 'week' | 'day';
 
@@ -42,11 +44,15 @@ interface CalendarEvent {
     textColor: string;
     type: 'project' | 'job' | 'reminder';
     time?: string;
+    projectId?: string; // For navigation
 }
 
 export default function Calendar() {
     const [currentDate, setCurrentDate] = useState(new Date());
     const [view, setView] = useState<ViewMode>('month');
+    const navigate = useNavigate();
+
+    const [selectedTransaction, setSelectedTransaction] = useState<any | null>(null);
 
     // Fetch Data
     const { data: projects } = useQuery({ queryKey: ['projects'], queryFn: getProjects });
@@ -95,7 +101,8 @@ export default function Calendar() {
                             color: bg,
                             textColor: getContrastColor(bg),
                             type: 'project',
-                            time: format(dateObj, 'HH:mm')
+                            time: format(dateObj, 'HH:mm'),
+                            projectId: p.id
                         });
                     }
                 }
@@ -114,7 +121,8 @@ export default function Calendar() {
                     color: bg,
                     textColor: '#ffffff',
                     type: 'job',
-                    time: format(new Date(t.job_date), 'HH:mm')
+                    time: format(new Date(t.job_date), 'HH:mm'),
+                    projectId: t.project_id || undefined
                 });
             }
         });
@@ -132,7 +140,8 @@ export default function Calendar() {
                         color: bg,
                         textColor: '#ffffff',
                         type: 'reminder',
-                        time: format(dateObj, 'HH:mm')
+                        time: format(dateObj, 'HH:mm'),
+                        projectId: r.project_id
                     });
                 }
             }
@@ -155,6 +164,27 @@ export default function Calendar() {
     };
 
     const today = () => setCurrentDate(new Date());
+
+    const handleEventClick = (event: CalendarEvent) => {
+        if (event.type === 'project') {
+            navigate(`/projects/${event.id}`);
+        } else if (event.type === 'reminder') {
+            if (event.projectId) {
+                navigate(`/projects/${event.projectId}`);
+            }
+        } else if (event.type === 'job') {
+            if (event.projectId) {
+                navigate(`/projects/${event.projectId}`);
+            } else {
+                // Standalone job -> Open Dialog
+                // Find the transaction object
+                const transaction = transactions?.find(t => t.id === event.id);
+                if (transaction) {
+                    setSelectedTransaction(transaction);
+                }
+            }
+        }
+    };
 
     // Renderers
     const renderMonthView = () => {
@@ -201,7 +231,8 @@ export default function Calendar() {
                                     {dayEvents.map(event => (
                                         <div
                                             key={event.id}
-                                            className="text-[10px] px-1.5 py-0.5 rounded truncate font-medium cursor-pointer flex items-center gap-1 border border-white/20 shadow-sm"
+                                            onClick={(e) => { e.stopPropagation(); handleEventClick(event); }}
+                                            className="text-[10px] px-1.5 py-0.5 rounded truncate font-medium cursor-pointer flex items-center gap-1 border border-white/20 shadow-sm transition-opacity hover:opacity-80"
                                             style={{
                                                 backgroundColor: event.color,
                                                 color: event.textColor
@@ -270,7 +301,8 @@ export default function Calendar() {
                                         {dayJobs.map(job => (
                                             <div
                                                 key={job.id}
-                                                className="text-[10px] px-1.5 py-0.5 rounded truncate font-medium cursor-pointer shadow-sm opacity-90 hover:opacity-100 flex items-center justify-center text-center"
+                                                onClick={(e) => { e.stopPropagation(); handleEventClick(job); }}
+                                                className="text-[10px] px-1.5 py-0.5 rounded truncate font-medium cursor-pointer shadow-sm opacity-90 hover:opacity-100 flex items-center justify-center text-center transition-transform hover:scale-[1.02]"
                                                 style={{
                                                     backgroundColor: job.color,
                                                     color: job.textColor
@@ -309,6 +341,7 @@ export default function Calendar() {
                                             {hourEvents.map(event => (
                                                 <div
                                                     key={event.id}
+                                                    onClick={(e) => { e.stopPropagation(); handleEventClick(event); }}
                                                     className="mb-1 text-xs p-1.5 rounded shadow-sm cursor-pointer hover:brightness-95 transition-all opacity-90 hover:opacity-100 z-10 border border-white/20"
                                                     style={{
                                                         backgroundColor: event.color,
@@ -388,6 +421,12 @@ export default function Calendar() {
 
             {/* Main Content */}
             {view === 'month' ? renderMonthView() : renderDayWeekView()}
+
+            <DeliveryDetailDialog
+                isOpen={!!selectedTransaction}
+                onClose={() => setSelectedTransaction(null)}
+                transaction={selectedTransaction}
+            />
         </div>
     );
 }
