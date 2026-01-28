@@ -5,7 +5,7 @@ import { InventoryDialog } from '../components/InventoryDialog';
 import { CategoryManagerDialog } from '../components/inventory/CategoryManagerDialog';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
-import { Plus, Search, Edit, Trash2, Box, Wrench, AlertCircle, Settings, LayoutGrid, List, Download } from 'lucide-react';
+import { Plus, Search, Edit, Trash2, Box, AlertCircle, Settings, LayoutGrid, List, Download } from 'lucide-react';
 import type { InventoryItem } from '../types';
 import * as XLSX from 'xlsx';
 import { cn } from '../lib/utils';
@@ -93,7 +93,6 @@ export default function Inventory() {
 
 
     const totalValue = inventory?.reduce((sum, item) => sum + (Number(item.price) || 0), 0) || 0;
-    const maintenanceCount = inventory?.filter(i => i.status === 'maintenance').length || 0;
 
     const getStatusBadge = (status: string) => {
         // User requested removing 'Ofiste' specifically to make cards smaller
@@ -136,6 +135,10 @@ export default function Inventory() {
         XLSX.writeFile(wb, `Envanter_Listesi_${new Date().toLocaleDateString('tr-TR')}.xlsx`);
     };
 
+    const handleCategoryClick = (categoryName: string) => {
+        setCategoryFilter(prev => prev === categoryName ? 'All' : categoryName);
+    };
+
     return (
         <div className="space-y-6 animate-in fade-in duration-500">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -156,29 +159,57 @@ export default function Inventory() {
                 </div>
             </div>
 
-            {/* Stats Cards */}
-            <div className="grid gap-4 md:grid-cols-3">
+            {/* Top Stats Cards */}
+            <div className="grid gap-4 md:grid-cols-2">
                 <div className="rounded-xl border bg-card text-card-foreground shadow-sm p-4 flex flex-col">
                     <div className="text-sm font-medium text-muted-foreground mb-1 flex items-center">
                         <Box className="w-4 h-4 mr-2" /> Toplam Ekipman
                     </div>
-                    <div className="text-2xl font-bold">{inventory?.length || 0} adet</div>
-                </div>
-                <div className="rounded-xl border bg-card text-card-foreground shadow-sm p-4 flex flex-col">
-                    <div className="text-sm font-medium text-muted-foreground mb-1 flex items-center">
-                        <Wrench className="w-4 h-4 mr-2" /> Bakımdaki Ürünler
-                    </div>
-                    <div className="text-2xl font-bold text-orange-600">{maintenanceCount} adet</div>
+                    <div className="text-3xl font-bold">{inventory?.length || 0} adet</div>
                 </div>
                 <div className="rounded-xl border bg-card text-card-foreground shadow-sm p-4 flex flex-col">
                     <div className="text-sm font-medium text-muted-foreground mb-1 flex items-center">
                         <AlertCircle className="w-4 h-4 mr-2" /> Toplam Değer
                     </div>
-                    <div className="text-2xl font-bold">₺{totalValue.toLocaleString('tr-TR')}</div>
+                    <div className="text-3xl font-bold">₺{totalValue.toLocaleString('tr-TR')}</div>
                 </div>
             </div>
 
-            {/* Filters */}
+            {/* Category Filter Cards */}
+            <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 gap-3">
+                <div
+                    onClick={() => handleCategoryClick('All')}
+                    className={cn(
+                        "cursor-pointer rounded-lg border p-3 flex flex-col gap-1 transition-all hover:shadow-md",
+                        categoryFilter === 'All'
+                            ? "bg-primary text-primary-foreground border-primary shadow-md transform scale-[1.02]"
+                            : "bg-card text-card-foreground hover:bg-muted/50"
+                    )}
+                >
+                    <span className="text-xs font-medium opacity-80">Tümü</span>
+                    <span className="text-lg font-bold">{inventory?.length || 0}</span>
+                </div>
+                {categories.map(cat => {
+                    const count = inventory?.filter(i => i.category === cat.name).length || 0;
+                    return (
+                        <div
+                            key={cat.id}
+                            onClick={() => handleCategoryClick(cat.name)}
+                            className={cn(
+                                "cursor-pointer rounded-lg border p-3 flex flex-col gap-1 transition-all hover:shadow-md",
+                                categoryFilter === cat.name
+                                    ? "bg-primary text-primary-foreground border-primary shadow-md transform scale-[1.02]"
+                                    : "bg-card text-card-foreground hover:bg-muted/50"
+                            )}
+                        >
+                            <span className="text-xs font-medium opacity-80 truncate" title={cat.name}>{cat.name}</span>
+                            <span className="text-lg font-bold">{count}</span>
+                        </div>
+                    );
+                })}
+            </div>
+
+            {/* Filters Bar */}
             <div className="flex flex-col md:flex-row gap-4 items-center bg-card p-4 rounded-lg border shadow-sm">
                 <div className="relative flex-1 w-full">
                     <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
@@ -190,14 +221,6 @@ export default function Inventory() {
                     />
                 </div>
                 <div className="flex flex-wrap gap-2 w-full md:w-auto items-center">
-                    <select
-                        value={categoryFilter}
-                        onChange={(e) => setCategoryFilter(e.target.value)}
-                        className="h-10 rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring flex-1 md:flex-none"
-                    >
-                        <option value="All">Tüm Kategoriler</option>
-                        {categories.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
-                    </select>
 
                     <select
                         value={sortBy}
@@ -216,7 +239,8 @@ export default function Inventory() {
                             onClick={() => setViewMode('grid')}
                             className={cn(
                                 "p-1.5 rounded-sm transition-all",
-                                viewMode === 'grid' ? "bg-background shadow-sm text-foreground" : "text-muted-foreground hover:text-foreground"
+                                "text-muted-foreground hover:text-foreground", // Default state styling adjustment
+                                viewMode === 'grid' && "bg-background shadow-sm text-foreground"
                             )}
                         >
                             <LayoutGrid className="w-4 h-4" />
@@ -225,7 +249,8 @@ export default function Inventory() {
                             onClick={() => setViewMode('list')}
                             className={cn(
                                 "p-1.5 rounded-sm transition-all",
-                                viewMode === 'grid' ? "text-muted-foreground hover:text-foreground" : "bg-background shadow-sm text-foreground"
+                                "text-muted-foreground hover:text-foreground", // Default state styling adjustment
+                                viewMode === 'list' && "bg-background shadow-sm text-foreground"
                             )}
                         >
                             <List className="w-4 h-4" />
