@@ -2,7 +2,7 @@ import { Draggable } from '@hello-pangea/dnd';
 import { useNavigate } from 'react-router-dom';
 import { cn, calculateDuration } from '../lib/utils';
 import type { Project, Transaction } from '../types';
-import { Calendar, MoreVertical, Pencil, Trash2, Wallet, Eye, CheckCircle2, MousePointerClick } from 'lucide-react';
+import { Calendar, MoreVertical, Pencil, Trash2, Wallet, Eye, CheckCircle2, MousePointerClick, AlertTriangle } from 'lucide-react';
 import { format } from 'date-fns';
 import { tr } from 'date-fns/locale';
 import { Button } from './ui/button';
@@ -33,6 +33,23 @@ export function KanbanCard({ project, index, transactions, onEdit, onDelete, onA
         .reduce((sum, t) => sum + (t.amount || 0), 0) || 0;
     const isPaymentComplete = (project.price || 0) > 0 && projectIncome >= (project.price || 0);
 
+    // Calculate Overdue Status
+    let isOverdue = false;
+    if (project.project_installments && transactions) {
+        let remainingPaid = projectIncome;
+        const sortedInstallments = [...project.project_installments].sort((a: any, b: any) =>
+            new Date(a.due_date).getTime() - new Date(b.due_date).getTime()
+        );
+
+        isOverdue = sortedInstallments.some(inst => {
+            if (remainingPaid >= inst.amount) {
+                remainingPaid -= inst.amount;
+                return false;
+            }
+            return new Date(inst.due_date) < new Date(new Date().setHours(0, 0, 0, 0));
+        });
+    }
+
     return (
         <Draggable draggableId={project.id} index={index}>
             {(provided, snapshot) => (
@@ -43,7 +60,12 @@ export function KanbanCard({ project, index, transactions, onEdit, onDelete, onA
                     onClick={() => navigate(`/projects/${project.id}`)}
                     className={cn(
                         "group relative rounded-lg border bg-card text-card-foreground shadow-sm transition-all hover:shadow-md cursor-pointer flex flex-col overflow-hidden",
-                        snapshot.isDragging ? 'shadow-lg ring-2 ring-primary ring-opacity-50 opacity-90' : ''
+                        snapshot.isDragging ? 'shadow-lg ring-2 ring-primary ring-opacity-50 opacity-90' : '',
+                        isOverdue
+                            ? "border-red-300 bg-red-50/50 dark:bg-red-950/20 ring-2 ring-red-400"
+                            : isPaymentComplete
+                                ? "border-green-200 bg-green-50/50"
+                                : ""
                     )}
                     style={{
                         ...provided.draggableProps.style,
@@ -87,11 +109,16 @@ export function KanbanCard({ project, index, transactions, onEdit, onDelete, onA
 
                                     return null;
                                 })()}
-                                {isPaymentComplete && (
+                                {isOverdue ? (
+                                    <div className="flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-red-100 text-red-700 text-[10px] font-bold border border-red-200" title="Ödeme Gecikti">
+                                        <AlertTriangle className="w-2.5 h-2.5" />
+                                        <span className="truncate">Ödeme Gecikti</span>
+                                    </div>
+                                ) : isPaymentComplete ? (
                                     <div className="flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-green-100 text-green-700 text-[10px] font-bold border border-green-200" title="Ödeme Tamam">
                                         <CheckCircle2 className="w-2.5 h-2.5" />
                                     </div>
-                                )}
+                                ) : null}
                             </div>
 
                             <div className="absolute top-3 right-3">
@@ -178,8 +205,7 @@ export function KanbanCard({ project, index, transactions, onEdit, onDelete, onA
                         );
                     })()}
                 </div>
-            )
-            }
+            )}
         </Draggable >
     );
 }
