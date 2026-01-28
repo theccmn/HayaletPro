@@ -47,6 +47,7 @@ export function SelectionManagerDialog({ isOpen, onClose, project }: SelectionMa
     const [copied, setCopied] = useState(false);
     const [isEditing, setIsEditing] = useState(false);
     const [isUnlockConfirmOpen, setIsUnlockConfirmOpen] = useState(false);
+    const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
 
     // Fetch existing selection
     const { data: existingSelection, isLoading } = useQuery({
@@ -313,11 +314,7 @@ export function SelectionManagerDialog({ isOpen, onClose, project }: SelectionMa
                         <Button
                             variant="destructive"
                             size="sm"
-                            onClick={() => {
-                                if (window.confirm("⚠️ Paneli tamamen silmek üzeresiniz!\n\nMüşteri erişimi kaybolacak ve seçim verileri silinecek.\n\nDevam etmek istiyor musunuz?")) {
-                                    deleteMutation.mutate();
-                                }
-                            }}
+                            onClick={() => setIsDeleteConfirmOpen(true)}
                         >
                             <Trash2 size={14} className="mr-2" /> Paneli Sil
                         </Button>
@@ -553,6 +550,29 @@ export function SelectionManagerDialog({ isOpen, onClose, project }: SelectionMa
                             className="bg-amber-600 hover:bg-amber-700 text-white"
                         >
                             Kilidi Kaldır
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
+
+            <AlertDialog open={isDeleteConfirmOpen} onOpenChange={setIsDeleteConfirmOpen}>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>Paneli Silmek İstiyor Musunuz?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            Bu işlem geri alınamaz. Müşteri erişimi kaybolacak ve tüm seçim verileri kalıcı olarak silinecektir.
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel>İptal</AlertDialogCancel>
+                        <AlertDialogAction
+                            onClick={() => {
+                                deleteMutation.mutate();
+                                setIsDeleteConfirmOpen(false);
+                            }}
+                            className="bg-red-600 hover:bg-red-700 text-white"
+                        >
+                            Evet, Sil
                         </AlertDialogAction>
                     </AlertDialogFooter>
                 </AlertDialogContent>

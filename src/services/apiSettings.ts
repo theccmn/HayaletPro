@@ -12,13 +12,10 @@ export const getSetting = async (key: string): Promise<string | null> => {
     .from('settings')
     .select('value')
     .eq('key', key)
-    .single();
+    .maybeSingle();
 
   if (error) {
-    // If error is code 'PGRST116', it means no rows found (key doesn't exist)
-    if (error.code !== 'PGRST116') {
-      console.error(`Error fetching setting ${key}:`, error);
-    }
+    console.error(`Error fetching setting ${key}:`, error);
     return null;
   }
 

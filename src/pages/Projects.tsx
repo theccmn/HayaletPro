@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { deleteProject, getProjects, updateProjectStatus } from '../services/apiProjects';
 import type { Project } from '../types';
-import { Plus, LayoutGrid, List as ListIcon, Loader2, Calendar, MoreVertical, Pencil, Trash2, Eye, EyeOff, ArrowUpDown, ArrowUp, ArrowDown, Wallet, Settings2, Kanban as KanbanIcon, CheckCircle2, ZoomIn, ZoomOut, Clock, Search, AlertTriangle, Tag, Map, MapPin } from 'lucide-react';
+import { Plus, LayoutGrid, List as ListIcon, Loader2, Calendar, MoreVertical, Pencil, Trash2, Eye, EyeOff, ArrowUpDown, ArrowUp, ArrowDown, Wallet, Settings2, Kanban as KanbanIcon, CheckCircle2, ZoomIn, ZoomOut, Clock, Search, AlertTriangle, Tag, Map, MapPin, MousePointerClick } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { useState } from 'react';
 import { cn, calculateDuration } from '../lib/utils';
@@ -656,12 +656,30 @@ export default function Projects() {
                                             {/* Footer Alerts */}
                                             <div className="flex flex-wrap items-center gap-2 pt-3 border-t min-h-[40px]">
                                                 {/* @ts-ignore */}
-                                                {(project.photo_selections?.status === 'completed' || (Array.isArray(project.photo_selections) && project.photo_selections[0]?.status === 'completed')) && (
-                                                    <div className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 text-xs font-bold border border-blue-200 animate-in fade-in zoom-in" title="Müşteri seçimini tamamladı">
-                                                        <CheckCircle2 className="w-3 h-3" />
-                                                        <span className="hidden xl:inline">Seçim Tamam</span>
-                                                    </div>
-                                                )}
+                                                {/* @ts-ignore */}
+                                                {(() => {
+                                                    const selection = Array.isArray(project.photo_selections) ? project.photo_selections[0] : project.photo_selections;
+                                                    const status = selection?.status;
+
+                                                    if (status === 'completed') {
+                                                        return (
+                                                            <div className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 text-xs font-bold border border-blue-200 animate-in fade-in zoom-in" title="Müşteri seçimini tamamladı">
+                                                                <CheckCircle2 className="w-3 h-3" />
+                                                                <span className="hidden xl:inline">Seçim Tamam</span>
+                                                            </div>
+                                                        );
+                                                    }
+
+                                                    if (status === 'selecting' || status === 'waiting' || status === 'viewed') {
+                                                        return (
+                                                            <div className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-orange-100 text-orange-700 text-xs font-bold border border-orange-200 animate-in fade-in zoom-in" title="Müşteri seçim yapıyor">
+                                                                <MousePointerClick className="w-3 h-3" />
+                                                                <span className="hidden xl:inline">Müşteri Seçiyor</span>
+                                                            </div>
+                                                        );
+                                                    }
+                                                    return null;
+                                                })()}
                                                 {isDeliveryOverdue && (
                                                     <div className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-purple-100 text-purple-700 text-xs font-bold border border-purple-200 animate-in fade-in zoom-in animate-pulse" title="Teslim Tarihi Geçti">
                                                         <AlertTriangle className="w-3 h-3" />
@@ -779,12 +797,30 @@ export default function Projects() {
                                         {/* Tags */}
                                         <div className="hidden xl:flex items-center gap-2 shrink-0">
                                             {/* @ts-ignore */}
-                                            {(project.photo_selections?.status === 'completed' || (Array.isArray(project.photo_selections) && project.photo_selections[0]?.status === 'completed')) && (
-                                                <div className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 text-xs font-bold border border-blue-200" title="Müşteri seçimini tamamladı">
-                                                    <CheckCircle2 className="w-3 h-3" />
-                                                    <span className="hidden lg:inline">Seçildi</span>
-                                                </div>
-                                            )}
+                                            {/* @ts-ignore */}
+                                            {(() => {
+                                                const selection = Array.isArray(project.photo_selections) ? project.photo_selections[0] : project.photo_selections;
+                                                const status = selection?.status;
+
+                                                if (status === 'completed') {
+                                                    return (
+                                                        <div className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 text-xs font-bold border border-blue-200" title="Müşteri seçimini tamamladı">
+                                                            <CheckCircle2 className="w-3 h-3" />
+                                                            <span className="hidden lg:inline">Seçildi</span>
+                                                        </div>
+                                                    );
+                                                }
+
+                                                if (status === 'selecting' || status === 'waiting' || status === 'viewed') {
+                                                    return (
+                                                        <div className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-orange-100 text-orange-700 text-xs font-bold border border-orange-200" title="Müşteri seçim yapıyor">
+                                                            <MousePointerClick className="w-3 h-3" />
+                                                            <span className="hidden lg:inline">Seçiyor</span>
+                                                        </div>
+                                                    );
+                                                }
+                                                return null;
+                                            })()}
                                             {(() => {
                                                 const income = transactions
                                                     ?.filter(t => t.type === 'income' && t.project_id === project.id)

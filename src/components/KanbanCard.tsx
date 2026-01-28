@@ -2,7 +2,7 @@ import { Draggable } from '@hello-pangea/dnd';
 import { useNavigate } from 'react-router-dom';
 import { cn, calculateDuration } from '../lib/utils';
 import type { Project, Transaction } from '../types';
-import { Calendar, MoreVertical, Pencil, Trash2, Wallet, Eye, CheckCircle2 } from 'lucide-react';
+import { Calendar, MoreVertical, Pencil, Trash2, Wallet, Eye, CheckCircle2, MousePointerClick } from 'lucide-react';
 import { format } from 'date-fns';
 import { tr } from 'date-fns/locale';
 import { Button } from './ui/button';
@@ -59,14 +59,34 @@ export function KanbanCard({ project, index, transactions, onEdit, onDelete, onA
                         <div className="flex justify-between items-start">
                             <div className="flex flex-wrap gap-1.5 items-center pr-6">
                                 <span className="text-[10px] font-medium text-muted-foreground px-2 py-0.5 bg-muted rounded-md line-clamp-1 max-w-[100px]">
+
                                     {project.client_name}
                                 </span>
-                                {/* @ts-ignore */}
-                                {(project.photo_selections?.status === 'completed' || (Array.isArray(project.photo_selections) && project.photo_selections[0]?.status === 'completed')) && (
-                                    <div className="flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-blue-100 text-blue-700 text-[10px] font-bold border border-blue-200" title="Seçim Tamam">
-                                        <CheckCircle2 className="w-2.5 h-2.5" />
-                                    </div>
-                                )}
+                                {(() => {
+                                    // @ts-ignore
+                                    const selection = Array.isArray(project.photo_selections) ? project.photo_selections[0] : project.photo_selections;
+                                    const status = selection?.status;
+
+                                    if (status === 'completed') {
+                                        return (
+                                            <div className="flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-blue-100 text-blue-700 text-[10px] font-bold border border-blue-200" title="Seçim Tamam">
+                                                <CheckCircle2 className="w-2.5 h-2.5" />
+                                                <span className="truncate">Seçim Tamam</span>
+                                            </div>
+                                        );
+                                    }
+
+                                    if (status === 'selecting' || status === 'waiting' || status === 'viewed') {
+                                        return (
+                                            <div className="flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-orange-100 text-orange-700 text-[10px] font-bold border border-orange-200" title="Müşteri Seçiyor">
+                                                <MousePointerClick className="w-2.5 h-2.5" />
+                                                <span className="truncate">Müşteri Seçiyor</span>
+                                            </div>
+                                        );
+                                    }
+
+                                    return null;
+                                })()}
                                 {isPaymentComplete && (
                                     <div className="flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-green-100 text-green-700 text-[10px] font-bold border border-green-200" title="Ödeme Tamam">
                                         <CheckCircle2 className="w-2.5 h-2.5" />
@@ -158,7 +178,8 @@ export function KanbanCard({ project, index, transactions, onEdit, onDelete, onA
                         );
                     })()}
                 </div>
-            )}
-        </Draggable>
+            )
+            }
+        </Draggable >
     );
 }
