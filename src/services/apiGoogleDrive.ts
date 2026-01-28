@@ -41,11 +41,11 @@ export const listDriveFiles = async (folderId: string): Promise<DriveFile[]> => 
 
         if (!data.files) return [];
 
-        // High-res thumbnail hack: Replace 's220' with 's1000' in thumbnailLink
+        // High-res thumbnail hack: Replace size param (e.g. =s220) with larger size
         return data.files.map((f: any) => ({
             ...f,
-            thumbnailLink: f.thumbnailLink ? f.thumbnailLink.replace('=s220', '=s600') : '', // Grid thumbnail
-            webContentLink: f.thumbnailLink ? f.thumbnailLink.replace('=s220', '=s1920') : f.webContentLink, // Lightbox high-res (Full HD)
+            thumbnailLink: f.thumbnailLink ? f.thumbnailLink.replace(/=s\d+/, '=s600') : '', // Grid thumbnail
+            webContentLink: f.thumbnailLink ? f.thumbnailLink.replace(/=s\d+/, '=s1920') : f.webContentLink, // Lightbox high-res (Full HD)
         }));
 
     } catch (error) {

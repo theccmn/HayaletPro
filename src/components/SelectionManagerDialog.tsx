@@ -12,6 +12,16 @@ import { Loader2, Copy, Check, ExternalLink, Plus, Trash2, Info, RefreshCw, Penc
 import { format } from 'date-fns';
 import { tr } from 'date-fns/locale';
 import { SelectionGalleryDialog } from './SelectionGalleryDialog';
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from "./ui/alert-dialog";
 
 interface SelectionManagerDialogProps {
     isOpen: boolean;
@@ -36,6 +46,7 @@ export function SelectionManagerDialog({ isOpen, onClose, project }: SelectionMa
     const [newExtraLimit, setNewExtraLimit] = useState(1);
     const [copied, setCopied] = useState(false);
     const [isEditing, setIsEditing] = useState(false);
+    const [isUnlockConfirmOpen, setIsUnlockConfirmOpen] = useState(false);
 
     // Fetch existing selection
     const { data: existingSelection, isLoading } = useQuery({
@@ -211,11 +222,10 @@ export function SelectionManagerDialog({ isOpen, onClose, project }: SelectionMa
                             {/* Unlock Button for Completed Selections */}
                             {existingSelection.status === 'completed' && (
                                 <Button
-                                    onClick={() => {
-                                        if (window.confirm('Seçim kilidini kaldırmak istiyor musunuz? Müşteri tekrar seçim yapabilecek.')) {
-                                            unlockMutation.mutate();
-                                        }
-                                    }}
+                                    onClick={() => setIsUnlockConfirmOpen(true)}
+                                    // if (window.confirm('Seçim kilidini kaldırmak istiyor musunuz? Müşteri tekrar seçim yapabilecek.')) {
+                                    //     unlockMutation.mutate();
+                                    // }
                                     variant="outline"
                                     className="bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100"
                                 >
@@ -521,6 +531,32 @@ export function SelectionManagerDialog({ isOpen, onClose, project }: SelectionMa
                     projectName={project.title}
                 />
             )}
+
+
+            <AlertDialog open={isUnlockConfirmOpen} onOpenChange={setIsUnlockConfirmOpen}>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>Seçim Kilidini Kaldır</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            Kilidi kaldırdığınızda müşteriniz <strong>tekrar seçim yapabilecek</strong> ve mevcut seçimler güncellenebilecektir.
+                            <br /><br />
+                            Devam etmek istiyor musunuz?
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel>Vazgeç</AlertDialogCancel>
+                        <AlertDialogAction
+                            onClick={() => {
+                                unlockMutation.mutate();
+                                setIsUnlockConfirmOpen(false);
+                            }}
+                            className="bg-amber-600 hover:bg-amber-700 text-white"
+                        >
+                            Kilidi Kaldır
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
         </Dialog>
     );
 }

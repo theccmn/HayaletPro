@@ -426,6 +426,7 @@ export function ClientSelectionView() {
                             <img
                                 src={photo.thumbnailLink}
                                 loading="lazy"
+                                referrerPolicy="no-referrer"
                                 className="w-full h-full object-cover"
                                 alt=""
                             />

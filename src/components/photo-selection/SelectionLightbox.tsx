@@ -97,6 +97,7 @@ export function SelectionLightbox({
                 {!isHighResLoaded && (
                     <img
                         src={activePhoto.thumbnailLink}
+                        referrerPolicy="no-referrer"
                         className="absolute max-h-full max-w-full object-contain blur-md scale-105 opacity-50"
                         alt="loading-preview"
                     />
@@ -104,6 +105,7 @@ export function SelectionLightbox({
 
                 <img
                     src={activePhoto.webContentLink}
+                    referrerPolicy="no-referrer"
                     className={cn(
                         "max-h-full max-w-full object-contain shadow-2xl transition-opacity duration-300 relative z-10",
                         isHighResLoaded ? "opacity-100" : "opacity-0"
