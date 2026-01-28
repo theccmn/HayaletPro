@@ -226,7 +226,6 @@ export default function Calendar() {
     const renderDayWeekView = () => {
         // For simplicity, we'll render a vertical list of hours for the day view,
         // and a grid for the week view.
-        // Actually, let's consolidate. A standard "Day" view is just a 1-column Week view.
 
         const viewStart = view === 'week' ? startOfWeek(currentDate, { weekStartsOn: 1 }) : startOfDay(currentDate);
         const viewEnd = view === 'week' ? endOfWeek(currentDate, { weekStartsOn: 1 }) : endOfDay(currentDate);
@@ -235,92 +234,100 @@ export default function Calendar() {
 
         return (
             <div className="bg-card rounded-xl border shadow-sm flex-1 flex flex-col overflow-hidden h-full">
-                {/* Header Row */}
-                <div className="flex border-b bg-muted/40">
-                    <div className="w-16 border-r flex-shrink-0" /> {/* Time col spacer */}
-                    {daysToShow.map(day => (
-                        <div key={day.toString()} className="flex-1 p-3 text-center border-r last:border-r-0">
-                            <div className="text-sm font-medium text-muted-foreground">{format(day, 'EEE', { locale: tr })}</div>
-                            <div className={cn(
-                                "text-lg font-bold inline-flex h-8 w-8 items-center justify-center rounded-full mt-1",
-                                isSameDay(day, new Date()) && "bg-primary text-primary-foreground"
-                            )}>
-                                {format(day, 'd')}
-                            </div>
-                        </div>
-                    ))}
-                </div>
+                {/* Scrollable Container for Header + Content to ensure alignment */}
+                <div className="flex-1 overflow-y-auto relative">
 
-                {/* All Day / Jobs Section */}
-                <div className="flex border-b bg-muted/20 min-h-[40px]">
-                    <div className="w-16 border-r flex-shrink-0 flex justify-center items-center text-[10px] text-muted-foreground font-medium p-1 text-center bg-muted/5">
-                        Teslimat
-                    </div>
-                    {daysToShow.map(day => {
-                        // Filter for Job/Delivery events for this day
-                        const dayJobs = events.filter(e => isSameDay(e.date, day) && e.type === 'job');
+                    {/* Sticky Header Section */}
+                    <div className="sticky top-0 z-30 bg-card border-b shadow-sm">
 
-                        return (
-                            <div key={day.toString()} className="flex-1 border-r last:border-r-0 p-1 flex flex-col gap-1">
-                                {dayJobs.map(job => (
-                                    <div
-                                        key={job.id}
-                                        className="text-[10px] px-1.5 py-0.5 rounded truncate font-medium cursor-pointer shadow-sm opacity-90 hover:opacity-100 flex items-center justify-center text-center"
-                                        style={{
-                                            backgroundColor: job.color,
-                                            color: job.textColor
-                                        }}
-                                        title={job.title}
-                                    >
-                                        {job.title}
+                        {/* Date Header Row */}
+                        <div className="flex border-b bg-muted/40">
+                            <div className="w-16 border-r flex-shrink-0" /> {/* Time col spacer */}
+                            {daysToShow.map(day => (
+                                <div key={day.toString()} className="flex-1 p-3 text-center border-r last:border-r-0">
+                                    <div className="text-sm font-medium text-muted-foreground">{format(day, 'EEE', { locale: tr })}</div>
+                                    <div className={cn(
+                                        "text-lg font-bold inline-flex h-8 w-8 items-center justify-center rounded-full mt-1",
+                                        isSameDay(day, new Date()) && "bg-primary text-primary-foreground"
+                                    )}>
+                                        {format(day, 'd')}
                                     </div>
-                                ))}
-                            </div>
-                        );
-                    })}
-                </div>
+                                </div>
+                            ))}
+                        </div>
 
-                {/* Time Grid (Scrollable) */}
-                <div className="flex-1 overflow-y-auto">
-                    {hours.map(hour => (
-                        <div key={hour} className="flex min-h-[60px] border-b last:border-b-0 relative group">
-                            {/* Time Label */}
-                            <div className="w-16 border-r flex-shrink-0 flex justify-center items-start pt-2 text-xs text-muted-foreground bg-muted/10 sticky left-0 font-mono">
-                                {hour.toString().padStart(2, '0')}:00
+                        {/* All Day / Jobs Section */}
+                        <div className="flex bg-muted/20 min-h-[40px]">
+                            <div className="w-16 border-r flex-shrink-0 flex justify-center items-center text-[10px] text-muted-foreground font-medium p-1 text-center bg-muted/5">
+                                Teslimat
                             </div>
-
-                            {/* Days Columns */}
                             {daysToShow.map(day => {
-                                // Find events that start in this hour (Projects only)
-                                const hourEvents = events.filter(e =>
-                                    isSameDay(e.date, day) &&
-                                    e.type === 'project' &&
-                                    e.date.getHours() === hour
-                                );
+                                // Filter for Job/Delivery events for this day
+                                const dayJobs = events.filter(e => isSameDay(e.date, day) && e.type === 'job');
 
                                 return (
-                                    <div key={day.toString()} className="flex-1 border-r last:border-r-0 p-1 relative hover:bg-slate-50 transition-colors">
-                                        {hourEvents.map(event => (
+                                    <div key={day.toString()} className="flex-1 border-r last:border-r-0 p-1 flex flex-col gap-1">
+                                        {dayJobs.map(job => (
                                             <div
-                                                key={event.id}
-                                                className="mb-1 text-xs p-1.5 rounded shadow-sm cursor-pointer hover:brightness-95 transition-all opacity-90 hover:opacity-100 z-10 border border-white/20"
+                                                key={job.id}
+                                                className="text-[10px] px-1.5 py-0.5 rounded truncate font-medium cursor-pointer shadow-sm opacity-90 hover:opacity-100 flex items-center justify-center text-center"
                                                 style={{
-                                                    backgroundColor: event.color,
-                                                    color: event.textColor,
+                                                    backgroundColor: job.color,
+                                                    color: job.textColor
                                                 }}
+                                                title={job.title}
                                             >
-                                                <div className="font-bold flex items-center gap-1">
-                                                    {format(event.date, 'HH:mm')}
-                                                    <Clock className="w-3 h-3 opacity-50" />
-                                                </div>
-                                                <div className="truncate">{event.title}</div>
+                                                {job.title}
                                             </div>
                                         ))}
                                     </div>
                                 );
                             })}
                         </div>
-                    ))}
+                    </div>
+
+                    {/* Time Grid */}
+                    <div>
+                        {hours.map(hour => (
+                            <div key={hour} className="flex min-h-[60px] border-b last:border-b-0 relative group">
+                                {/* Time Label */}
+                                <div className="w-16 border-r flex-shrink-0 flex justify-center items-start pt-2 text-xs text-muted-foreground bg-muted/10 sticky left-0 z-10 font-mono">
+                                    {hour.toString().padStart(2, '0')}:00
+                                </div>
+
+                                {/* Days Columns */}
+                                {daysToShow.map(day => {
+                                    // Find events that start in this hour (Projects only)
+                                    const hourEvents = events.filter(e =>
+                                        isSameDay(e.date, day) &&
+                                        e.type === 'project' &&
+                                        e.date.getHours() === hour
+                                    );
+
+                                    return (
+                                        <div key={day.toString()} className="flex-1 border-r last:border-r-0 p-1 relative hover:bg-slate-50 transition-colors">
+                                            {hourEvents.map(event => (
+                                                <div
+                                                    key={event.id}
+                                                    className="mb-1 text-xs p-1.5 rounded shadow-sm cursor-pointer hover:brightness-95 transition-all opacity-90 hover:opacity-100 z-10 border border-white/20"
+                                                    style={{
+                                                        backgroundColor: event.color,
+                                                        color: event.textColor,
+                                                    }}
+                                                >
+                                                    <div className="font-bold flex items-center gap-1">
+                                                        {format(event.date, 'HH:mm')}
+                                                        <Clock className="w-3 h-3 opacity-50" />
+                                                    </div>
+                                                    <div className="truncate">{event.title}</div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        ))}
+                    </div>
                 </div>
             </div>
         );
